@@ -244,8 +244,9 @@
                 localStream = await navigator.mediaDevices.getDisplayMedia({ 
                     video: { 
                         cursor: "always",
-                        frameRate: { ideal: 60, max: 120 },
-                        width: { ideal: 1920 } // Prefer high-res for crisp VR
+                        frameRate: { ideal: 60, max: 144 },
+                        width: { ideal: 2560, max: 3840 }, // Push for 2K/4K source for sharper VR
+                        height: { ideal: 1440, max: 2160 }
                     }, 
                     audio: false 
                 });
@@ -275,6 +276,29 @@
                     statusEl.className = "text-sm text-emerald-400 font-bold";
                     
                     const call = peer.call(conn.peer, localStream);
+
+                    // --- QUALITY BOOST: Force WebRTC to use maximum bandwidth ---
+                    // Wait briefly for WebRTC to initialize, then force a massive bitrate limit
+                    setTimeout(async () => {
+                        try {
+                            const senders = call.peerConnection.getSenders();
+                            const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                            if (videoSender) {
+                                const params = videoSender.getParameters();
+                                if (!params.encodings) params.encodings = [{}];
+                                
+                                // Default WebRTC caps at ~2.5Mbps. We force up to 50 Mbps for local Wi-Fi clarity.
+                                params.encodings[0].maxBitrate = 50000000;
+                                
+                                await videoSender.setParameters(params);
+                                console.log("Stream quality and bitrate boosted!");
+                            }
+                        } catch (e) {
+                            console.warn("Could not boost stream quality:", e);
+                        }
+                    }, 1000);
+                    // ------------------------------------------------------------
+
                     call.on('error', err => {
                         console.error('Call error:', err);
                         statusEl.innerText = "Error streaming to device.";
