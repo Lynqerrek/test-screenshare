@@ -86,12 +86,14 @@
             </button>
         </div>
         <div id="host-step-2" class="hidden w-full flex-col items-center space-y-4 bg-slate-800/50 p-6 rounded-3xl border border-slate-700/50">
-            <div id="qrcode" class="bg-white p-4 rounded-2xl shadow-xl"></div>
+            <div id="qrcode-container" class="bg-white p-4 rounded-2xl shadow-xl">
+                <div id="qrcode"></div>
+            </div>
             <h1 id="host-id-display" class="text-4xl font-mono font-bold text-emerald-400 tracking-widest bg-slate-900/80 px-8 py-3 rounded-2xl border border-slate-700">...</h1>
             <p id="host-status" class="text-sm text-amber-400 animate-pulse">Waiting for connection...</p>
             <video id="host-preview" autoplay muted class="w-full mt-4 rounded-xl border border-slate-600 object-cover max-h-48 shadow-lg"></video>
         </div>
-        <button onclick="location.reload()" class="text-slate-500 hover:text-white underline">Back</button>
+        <button onclick="location.reload()" class="text-slate-500 hover:text-white underline mt-4">Back</button>
     </div>
 
     <!-- Mobile Client Setup -->
@@ -153,22 +155,24 @@
         let localStream = null;
         let vrFormat = '2d', fitMode = 'contain', currentZoom = 1.0, currentIpd = 0, uiTimeout;
 
-        // LAN-OPTIMIZED WEBRTC CONFIG
         const peerConfig = {
             config: {
                 iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
                 bundlePolicy: "max-bundle",
                 rtcpMuxPolicy: "require",
-                sdpSemantics: "unified-plan",
-                // Explicitly disable retransmissions to kill lag spikes
-                iceTransportPolicy: "all"
+                sdpSemantics: "unified-plan"
             }
         };
 
         function showScreen(id) {
-            ['screen-menu', 'screen-host', 'screen-client'].forEach(s => document.getElementById(s).classList.add('hidden'));
-            document.getElementById(id).classList.remove('hidden');
-            document.getElementById(id).classList.add('flex');
+            ['screen-menu', 'screen-host', 'screen-client'].forEach(s => {
+                const el = document.getElementById(s);
+                el.classList.add('hidden');
+                el.classList.remove('flex');
+            });
+            const target = document.getElementById(id);
+            target.classList.remove('hidden');
+            target.classList.add('flex');
         }
 
         function generateShortId() {
@@ -180,35 +184,46 @@
 
         async function startScreenShare() {
             try {
-                // EXTREME DECODE SPEED: 1280x720 is significantly faster for phones to decode 
-                // compared to 1080p, reducing input lag by ~30-50ms alone.
-                localStream = await navigator.mediaDevices.getDisplayMedia({ 
-                    video: { 
-                        cursor: "always", 
-                        frameRate: { ideal: 60, max: 120 }, 
-                        width: { exact: 1280 }, 
-                        height: { exact: 720 },
-                        displaySurface: "monitor"
-                    }, 
-                    audio: false // Disabling audio removes overhead sync logic
-                });
-
-                const videoTrack = localStream.getVideoTracks()[0];
-                if (videoTrack && 'contentHint' in videoTrack) {
-                    videoTrack.contentHint = 'motion';
-                }
-
-                document.getElementById('host-preview').srcObject = localStream;
-                document.getElementById('host-step-1').classList.add('hidden');
-                document.getElementById('host-step-2').classList.remove('hidden');
-                document.getElementById('host-step-2').classList.add('flex');
-
+                // Initializing Peer first to ensure signaling is ready
                 const hostId = generateShortId();
                 peer = new Peer(hostId, peerConfig);
-                
-                peer.on('open', id => {
+
+                peer.on('open', async (id) => {
                     document.getElementById('host-id-display').innerText = id;
-                    new QRCode(document.getElementById("qrcode"), { text: window.location.href.split('?')[0] + '?id=' + id, width: 180, height: 180 });
+                    
+                    // Clear previous QR code if any
+                    document.getElementById('qrcode').innerHTML = "";
+                    new QRCode(document.getElementById("qrcode"), { 
+                        text: window.location.origin + window.location.pathname + '?id=' + id, 
+                        width: 180, 
+                        height: 180 
+                    });
+
+                    try {
+                        // Capture screen AFTER peer is open to avoid permission timeouts
+                        localStream = await navigator.mediaDevices.getDisplayMedia({ 
+                            video: { 
+                                cursor: "always", 
+                                frameRate: { ideal: 60 }, 
+                                width: { max: 1280 }, 
+                                height: { max: 720 }
+                            }, 
+                            audio: false 
+                        });
+
+                        const videoTrack = localStream.getVideoTracks()[0];
+                        if (videoTrack && 'contentHint' in videoTrack) {
+                            videoTrack.contentHint = 'motion';
+                        }
+
+                        document.getElementById('host-preview').srcObject = localStream;
+                        document.getElementById('host-step-1').classList.add('hidden');
+                        document.getElementById('host-step-2').classList.remove('hidden');
+                        document.getElementById('host-step-2').classList.add('flex');
+                    } catch (mediaErr) {
+                        console.error("Media Capture Error:", mediaErr);
+                        peer.destroy();
+                    }
                 });
 
                 peer.on('connection', conn => {
@@ -218,32 +233,33 @@
                     setTimeout(async () => {
                         try {
                             const sender = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-                            if (sender) {
-                                if ('setDegradationPreference' in sender) {
-                                    // NEVER drop frames. Always maintain speed.
-                                    sender.setDegradationPreference('maintain-framerate');
-                                }
-
+                            if (sender && sender.getParameters) {
                                 const params = sender.getParameters();
                                 if (!params.encodings) params.encodings = [{}];
                                 
-                                // LAN STRATEGY: High floor, moderate cap.
-                                // 20Mbps floor ensures the pipeline is always full and responsive.
                                 params.encodings[0].maxBitrate = 35000000; 
                                 params.encodings[0].minBitrate = 15000000; 
-                                params.encodings[0].priority = "high";
-                                params.encodings[0].networkPriority = "high";
                                 
                                 await sender.setParameters(params);
                             }
-                        } catch (e) { console.warn(e); }
-                    }, 100);
+                        } catch (e) { console.warn("Encoding Params Error:", e); }
+                    }, 500);
                 });
-            } catch (e) { location.reload(); }
+
+                peer.on('error', err => {
+                    console.error("Peer Error:", err);
+                });
+
+            } catch (e) { 
+                console.error("Generic Init Error:", e);
+                location.reload(); 
+            }
         }
 
         function connectToHost() {
             const tid = document.getElementById('target-id-input').value.toUpperCase();
+            if(!tid) return;
+
             peer = new Peer(null, peerConfig);
             peer.on('open', () => {
                 peer.connect(tid);
@@ -252,14 +268,11 @@
             peer.on('call', call => {
                 call.answer();
                 call.on('stream', s => {
-                    const receiver = call.peerConnection.getReceivers().find(r => r.track && r.track.kind === 'video');
-                    
-                    // KILL JITTER BUFFER: No delay, no smoothing.
-                    if (receiver && 'playoutDelayHint' in receiver) {
-                        receiver.playoutDelayHint = 0;
-                    }
                     enterVRMode(s);
                 });
+            });
+            peer.on('error', err => {
+                document.getElementById('client-status').innerText = "Connection Failed.";
             });
         }
 
@@ -274,14 +287,6 @@
             l.srcObject = stream;
             r.srcObject = stream;
             
-            [l, r].forEach(v => {
-                v.setAttribute('autoplay', '');
-                v.setAttribute('muted', '');
-                v.setAttribute('playsinline', '');
-                // Low latency play hint
-                v.play();
-            });
-
             toggleFullscreen();
             updateVRCalibration();
             showVRUI();
@@ -350,9 +355,10 @@
         
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('id')) {
+            const id = urlParams.get('id');
+            if (id) {
                 showScreen('screen-client');
-                document.getElementById('target-id-input').value = urlParams.get('id').toUpperCase();
+                document.getElementById('target-id-input').value = id.toUpperCase();
             }
         };
     </script>
