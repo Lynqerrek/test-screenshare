@@ -14,8 +14,13 @@
         body { background-color: #0f172a; color: white; overflow: hidden; }
         /* VR specific layout styles */
         #vr-container { display: none; width: 100vw; height: 100vh; background: #000; flex-direction: row; position: absolute; top: 0; left: 0; z-index: 50; }
-        .eye { width: 50%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
-        .eye video { width: 100%; height: 100%; object-fit: contain; transform: scale(1.05); /* Slight scale to hide edges */ }
+        .eye { width: 50%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background: #000; }
+        .eye::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, transparent 40%, #000 90%);
+            pointer-events: none; z-index: 10;
+        }
+        .eye video { width: 100%; height: 100%; object-fit: contain; transform: scale(1.1); transition: transform 0.1s ease-out; }
         .divider { position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; background: #111; z-index: 10; transform: translateX(-50%); }
         
         /* Custom scrollbar for aesthetic */
@@ -100,12 +105,26 @@
         </div>
 
         <!-- VR Overlay UI (Hidden after a few seconds or transparent) -->
-        <div class="absolute top-4 left-0 w-full flex justify-between px-8 z-50 opacity-30 hover:opacity-100 transition-opacity">
-            <button onclick="location.reload()" class="bg-red-600/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg backdrop-blur-sm text-sm font-semibold">Exit VR</button>
-            <button onclick="toggleFullscreen()" class="bg-slate-800/80 hover:bg-slate-700 text-white px-4 py-2 rounded-lg backdrop-blur-sm text-sm font-semibold flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
-                Fullscreen
-            </button>
+        <div class="absolute top-4 left-0 w-full flex flex-col items-center z-50 opacity-30 hover:opacity-100 transition-opacity gap-4">
+            <div class="flex justify-between w-full px-8">
+                <button onclick="location.reload()" class="bg-red-600/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg backdrop-blur-sm text-sm font-semibold">Exit VR</button>
+                <button onclick="toggleFullscreen()" class="bg-slate-800/80 hover:bg-slate-700 text-white px-4 py-2 rounded-lg backdrop-blur-sm text-sm font-semibold flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                    Fullscreen
+                </button>
+            </div>
+            
+            <!-- Calibration Controls -->
+            <div class="bg-slate-900/80 backdrop-blur-md p-4 rounded-xl flex gap-6 text-sm">
+                <div class="flex flex-col items-center">
+                    <label class="text-slate-300 mb-1">Zoom</label>
+                    <input type="range" id="zoom-slider" min="0.5" max="2.5" step="0.05" value="1.1" class="w-24">
+                </div>
+                <div class="flex flex-col items-center">
+                    <label class="text-slate-300 mb-1">Eye Distance</label>
+                    <input type="range" id="ipd-slider" min="-100" max="100" step="1" value="0" class="w-24">
+                </div>
+            </div>
         </div>
     </div>
 
@@ -149,7 +168,10 @@
             try {
                 // Request screen capture (video only for pure VR stream to save bandwidth)
                 localStream = await navigator.mediaDevices.getDisplayMedia({ 
-                    video: { cursor: "always" }, 
+                    video: { 
+                        cursor: "always",
+                        frameRate: { ideal: 60, max: 120 }
+                    }, 
                     audio: false 
                 });
                 
@@ -298,6 +320,27 @@
                 else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
             }
         }
+
+        // VR Calibration Logic
+        let currentZoom = 1.1;
+        let currentIpd = 0;
+
+        function updateVRCalibration() {
+            const leftVideo = document.getElementById('video-left');
+            const rightVideo = document.getElementById('video-right');
+            leftVideo.style.transform = `scale(${currentZoom}) translateX(${currentIpd}px)`;
+            rightVideo.style.transform = `scale(${currentZoom}) translateX(${-currentIpd}px)`;
+        }
+
+        document.getElementById('zoom-slider').addEventListener('input', (e) => {
+            currentZoom = e.target.value;
+            updateVRCalibration();
+        });
+
+        document.getElementById('ipd-slider').addEventListener('input', (e) => {
+            currentIpd = e.target.value;
+            updateVRCalibration();
+        });
     </script>
 </body>
 </html>
