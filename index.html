@@ -11,22 +11,68 @@
     <!-- QRCodeJS for easy mobile connecting -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { background-color: #0f172a; color: white; overflow: hidden; }
-        /* VR specific layout styles */
-        #vr-container { display: none; width: 100vw; height: 100vh; background: #000; flex-direction: row; position: absolute; top: 0; left: 0; z-index: 50; }
-        .eye { width: 50%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background: #000; }
-        .eye::after {
-            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle at center, transparent 40%, #000 90%);
-            pointer-events: none; z-index: 10;
+        body { 
+            background-color: #0f172a; 
+            color: white; 
+            overflow: hidden; 
+            touch-action: none; /* Prevent accidental scrolling in VR */
         }
-        .eye video { width: 100%; height: 100%; object-fit: contain; transform: scale(1.1); transition: transform 0.1s ease-out; }
-        .divider { position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; background: #111; z-index: 10; transform: translateX(-50%); }
         
-        /* Custom scrollbar for aesthetic */
+        /* VR specific layout styles */
+        #vr-container { 
+            display: none; 
+            width: 100vw; 
+            height: 100vh; 
+            background: #000; 
+            flex-direction: row; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            z-index: 50; 
+        }
+        
+        .eye { 
+            width: 50%; 
+            height: 100%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            overflow: hidden; 
+            position: relative; 
+            background: #000; 
+        }
+        
+        /* Lens Vignette - Blends screen edges into the dark Cardboard box */
+        .vignette {
+            position: absolute; 
+            top: -10%; left: -10%; width: 120%; height: 120%;
+            background: radial-gradient(circle at center, transparent 35%, rgba(0,0,0,0.8) 75%, #000 95%);
+            pointer-events: none; 
+            z-index: 10;
+        }
+
+        .eye video { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; /* Fill the FOV completely */
+            transition: transform 0.1s linear; 
+        }
+        
+        .divider { 
+            position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; 
+            background: #000; z-index: 20; transform: translateX(-50%); 
+        }
+
+        /* Custom scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        
+        /* Input Range Styling for VR UI */
+        input[type=range] {
+            accent-color: #3b82f6;
+            width: 100%;
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen font-sans">
@@ -34,14 +80,14 @@
     <!-- Screen 1: Main Menu -->
     <div id="screen-menu" class="flex flex-col items-center justify-center w-full max-w-md p-6 text-center space-y-6 animate-fade-in">
         <div class="mb-4">
-            <h1 class="text-4xl font-bold text-blue-400 mb-2">VR Streamer</h1>
-            <p class="text-slate-400">Stream your PC screen directly to a mobile VR headset.</p>
+            <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">VR Streamer</h1>
+            <p class="text-slate-400">Stream your PC directly to a Cardboard VR headset.</p>
         </div>
-        <button onclick="showScreen('screen-host')" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold text-lg transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-3">
+        <button onclick="showScreen('screen-host')" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 rounded-2xl font-semibold text-lg transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-3">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-            Share PC Screen (Host)
+            Share Screen (Host)
         </button>
-        <button onclick="showScreen('screen-client')" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-semibold text-lg transition-all shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-3">
+        <button onclick="showScreen('screen-client')" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold text-lg transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-3">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
             Enter VR Mode (Mobile)
         </button>
@@ -49,44 +95,44 @@
 
     <!-- Screen 2: PC Host Setup -->
     <div id="screen-host" class="hidden flex-col items-center justify-center w-full max-w-lg p-6 text-center space-y-6">
-        <h2 class="text-2xl font-bold text-blue-400">Host Setup</h2>
+        <h2 class="text-3xl font-bold text-blue-400">Host Setup</h2>
         
         <div id="host-step-1" class="w-full flex flex-col items-center">
-            <p class="text-slate-300 mb-6">Click below to select the window or screen you want to cast to your VR headset.</p>
-            <button onclick="startScreenShare()" class="py-3 px-8 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold text-lg transition-all shadow-lg">
+            <p class="text-slate-300 mb-6">Select the window or screen to cast. For 3D movies or games, select the Side-by-Side (SBS) window.</p>
+            <button onclick="startScreenShare()" class="py-4 px-8 bg-blue-600 hover:bg-blue-500 rounded-2xl font-semibold text-lg transition-all shadow-lg shadow-blue-500/30">
                 Start Screen Capture
             </button>
         </div>
 
-        <div id="host-step-2" class="hidden w-full flex-col items-center space-y-4 bg-slate-800 p-6 rounded-2xl border border-slate-700">
+        <div id="host-step-2" class="hidden w-full flex-col items-center space-y-4 bg-slate-800/50 p-6 rounded-3xl border border-slate-700/50 backdrop-blur-sm">
             <p class="text-sm text-slate-400 font-semibold uppercase tracking-wider">Scan this with your phone</p>
-            <div id="qrcode" class="bg-white p-3 rounded-xl shadow-lg"></div>
+            <div id="qrcode" class="bg-white p-4 rounded-2xl shadow-xl"></div>
             <p class="text-sm text-slate-400 mt-4">Or enter this code manually:</p>
-            <h1 id="host-id-display" class="text-3xl font-mono font-bold text-emerald-400 tracking-widest bg-slate-900 px-6 py-2 rounded-lg border border-slate-700">...</h1>
+            <h1 id="host-id-display" class="text-4xl font-mono font-bold text-emerald-400 tracking-widest bg-slate-900/80 px-8 py-3 rounded-2xl border border-slate-700">...</h1>
             
             <div class="w-full mt-4">
                 <p id="host-status" class="text-sm text-amber-400 animate-pulse">Waiting for mobile device to connect...</p>
-                <video id="host-preview" autoplay muted class="w-full mt-4 rounded-lg border-2 border-slate-600 object-cover max-h-48"></video>
+                <video id="host-preview" autoplay muted class="w-full mt-4 rounded-xl border border-slate-600 object-cover max-h-48 shadow-lg"></video>
             </div>
         </div>
 
-        <button onclick="location.reload()" class="text-slate-500 hover:text-white mt-4 underline">Cancel & Go Back</button>
+        <button onclick="location.reload()" class="text-slate-500 hover:text-white mt-4 underline transition-colors">Cancel & Go Back</button>
     </div>
 
     <!-- Screen 3: Mobile Client Setup -->
     <div id="screen-client" class="hidden flex-col items-center justify-center w-full max-w-md p-6 text-center space-y-6">
-        <h2 class="text-2xl font-bold text-emerald-400">Mobile VR Receiver</h2>
+        <h2 class="text-3xl font-bold text-emerald-400">VR Receiver</h2>
         <p class="text-slate-300">Enter the 5-letter code displayed on your PC.</p>
         
-        <input type="text" id="target-id-input" maxlength="5" placeholder="CODE" class="w-full text-center text-3xl font-mono tracking-widest py-4 bg-slate-800 border-2 border-slate-600 rounded-xl text-white uppercase focus:border-emerald-500 focus:outline-none transition-colors">
+        <input type="text" id="target-id-input" maxlength="5" placeholder="CODE" class="w-full text-center text-4xl font-mono tracking-widest py-5 bg-slate-800/80 border-2 border-slate-600 rounded-2xl text-white uppercase focus:border-emerald-500 focus:outline-none transition-all shadow-inner">
         
-        <button onclick="connectToHost()" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-semibold text-lg transition-all shadow-lg shadow-emerald-500/30">
-            Connect & Enter VR
+        <button onclick="connectToHost()" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold text-lg transition-all shadow-lg shadow-emerald-500/30">
+            Connect
         </button>
         
-        <p id="client-status" class="text-sm text-slate-400"></p>
+        <p id="client-status" class="text-sm text-slate-400 h-6"></p>
         
-        <button onclick="location.reload()" class="text-slate-500 hover:text-white mt-4 underline">Cancel & Go Back</button>
+        <button onclick="location.reload()" class="text-slate-500 hover:text-white mt-2 underline transition-colors">Cancel & Go Back</button>
     </div>
 
     <!-- VR Split Screen View -->
@@ -94,46 +140,76 @@
         <!-- Left Eye -->
         <div class="eye">
             <video id="video-left" autoplay playsinline muted></video>
+            <div class="vignette"></div>
         </div>
         
-        <!-- Center Divider for Cardboard Alignment -->
+        <!-- Center Divider -->
         <div class="divider"></div>
         
         <!-- Right Eye -->
         <div class="eye">
             <video id="video-right" autoplay playsinline muted></video>
+            <div class="vignette"></div>
         </div>
 
-        <!-- VR Overlay UI (Hidden after a few seconds or transparent) -->
-        <div class="absolute top-4 left-0 w-full flex flex-col items-center z-50 opacity-30 hover:opacity-100 transition-opacity gap-4">
-            <div class="flex justify-between w-full px-8">
-                <button onclick="location.reload()" class="bg-red-600/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg backdrop-blur-sm text-sm font-semibold">Exit VR</button>
-                <button onclick="toggleFullscreen()" class="bg-slate-800/80 hover:bg-slate-700 text-white px-4 py-2 rounded-lg backdrop-blur-sm text-sm font-semibold flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+        <!-- VR Overlay UI (Auto-hides, tap to show) -->
+        <div id="vr-ui" class="absolute inset-0 flex flex-col items-center justify-between p-6 z-50 transition-opacity duration-300 opacity-0 pointer-events-none">
+            <!-- Top Bar -->
+            <div class="flex justify-between w-full max-w-3xl">
+                <button onclick="exitVRMode()" class="bg-red-600/90 hover:bg-red-500 text-white px-5 py-3 rounded-xl backdrop-blur-md text-sm font-bold shadow-lg pointer-events-auto">
+                    Exit VR
+                </button>
+                <button onclick="toggleFullscreen()" class="bg-slate-800/90 hover:bg-slate-700 text-white px-5 py-3 rounded-xl backdrop-blur-md text-sm font-bold flex items-center gap-2 shadow-lg pointer-events-auto">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
                     Fullscreen
                 </button>
             </div>
             
-            <!-- Calibration Controls -->
-            <div class="bg-slate-900/80 backdrop-blur-md p-4 rounded-xl flex gap-6 text-sm">
-                <div class="flex flex-col items-center">
-                    <label class="text-slate-300 mb-1">Zoom</label>
-                    <input type="range" id="zoom-slider" min="0.5" max="2.5" step="0.05" value="1.1" class="w-24">
+            <!-- Bottom Controls -->
+            <div class="bg-slate-900/90 backdrop-blur-xl p-6 rounded-3xl flex flex-col md:flex-row gap-6 text-sm shadow-2xl pointer-events-auto border border-slate-700/50 w-full max-w-3xl">
+                
+                <!-- Format Toggle -->
+                <div class="flex flex-col items-center justify-center border-r border-slate-700 pr-6">
+                    <label class="text-slate-300 mb-3 font-semibold text-xs tracking-wider uppercase">Source Format</label>
+                    <div class="flex bg-slate-800 rounded-lg p-1">
+                        <button id="btn-fmt-2d" onclick="setVRFormat('2d')" class="px-4 py-2 rounded-md bg-blue-600 text-white font-bold transition-colors">2D Screen</button>
+                        <button id="btn-fmt-sbs" onclick="setVRFormat('sbs')" class="px-4 py-2 rounded-md text-slate-400 hover:text-white font-bold transition-colors">3D (SBS)</button>
+                    </div>
                 </div>
-                <div class="flex flex-col items-center">
-                    <label class="text-slate-300 mb-1">Eye Distance</label>
-                    <input type="range" id="ipd-slider" min="-100" max="100" step="1" value="0" class="w-24">
+
+                <div class="flex-1 flex flex-col justify-center gap-4">
+                    <!-- Zoom Slider -->
+                    <div class="flex flex-col w-full">
+                        <div class="flex justify-between text-slate-400 mb-1 text-xs font-bold uppercase">
+                            <span>FOV / Zoom</span>
+                            <span id="lbl-zoom">1.0x</span>
+                        </div>
+                        <input type="range" id="zoom-slider" min="0.5" max="2.5" step="0.05" value="1.0">
+                    </div>
+
+                    <!-- IPD Slider -->
+                    <div class="flex flex-col w-full">
+                        <div class="flex justify-between text-slate-400 mb-1 text-xs font-bold uppercase">
+                            <span>Lens Alignment (IPD)</span>
+                            <span id="lbl-ipd">0px</span>
+                        </div>
+                        <input type="range" id="ipd-slider" min="-100" max="100" step="1" value="0">
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Global variables
+        // Global state
         let peer = null;
         let localStream = null;
+        let vrFormat = '2d'; // '2d' or 'sbs'
+        let currentZoom = 1.0;
+        let currentIpd = 0;
+        let uiTimeout;
 
-        // UI Management
+        // --- UI Management ---
         function showScreen(screenId) {
             ['screen-menu', 'screen-host', 'screen-client'].forEach(id => {
                 document.getElementById(id).classList.add('hidden');
@@ -143,9 +219,8 @@
             document.getElementById(screenId).classList.add('flex');
         }
 
-        // Generate a simple 5-character alphanumeric ID
         function generateShortId() {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // removed confusable chars
             let result = '';
             for (let i = 0; i < 5; i++) {
                 result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -153,7 +228,7 @@
             return result;
         }
 
-        // Check if loaded via QR code URL (auto-fill mobile client)
+        // Auto-fill from URL QR code
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
             const hostIdParam = urlParams.get('id');
@@ -166,52 +241,44 @@
         // --- HOST LOGIC (PC) --- //
         async function startScreenShare() {
             try {
-                // Request screen capture (video only for pure VR stream to save bandwidth)
                 localStream = await navigator.mediaDevices.getDisplayMedia({ 
                     video: { 
                         cursor: "always",
-                        frameRate: { ideal: 60, max: 120 }
+                        frameRate: { ideal: 60, max: 120 },
+                        width: { ideal: 1920 } // Prefer high-res for crisp VR
                     }, 
                     audio: false 
                 });
                 
-                // Show local preview
                 document.getElementById('host-preview').srcObject = localStream;
                 document.getElementById('host-step-1').classList.add('hidden');
                 document.getElementById('host-step-2').classList.remove('hidden');
                 document.getElementById('host-step-2').classList.add('flex');
 
-                // Initialize WebRTC Peer
                 const hostId = generateShortId();
                 peer = new Peer(hostId);
 
                 peer.on('open', id => {
                     document.getElementById('host-id-display').innerText = id;
                     
-                    // Generate QR Code containing the link
                     const shareUrl = window.location.origin + window.location.pathname + '?id=' + id;
-                    document.getElementById('qrcode').innerHTML = ""; // Clear existing
+                    document.getElementById('qrcode').innerHTML = ""; 
                     new QRCode(document.getElementById("qrcode"), { 
-                        text: shareUrl, 
-                        width: 160, 
-                        height: 160,
-                        colorDark : "#0f172a",
-                        colorLight : "#ffffff",
-                        correctLevel : QRCode.CorrectLevel.L
+                        text: shareUrl, width: 180, height: 180,
+                        colorDark : "#0f172a", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.L
                     });
                 });
 
-                // Wait for mobile to connect via data connection to signal readiness
                 peer.on('connection', conn => {
-                    document.getElementById('host-status').innerText = "Mobile device connected! Initiating stream...";
-                    document.getElementById('host-status').className = "text-sm text-emerald-400 font-bold";
+                    const statusEl = document.getElementById('host-status');
+                    statusEl.innerText = "Device connected! Streaming in progress...";
+                    statusEl.className = "text-sm text-emerald-400 font-bold";
                     
-                    // Call the connected mobile device with our screen stream
                     const call = peer.call(conn.peer, localStream);
-                    
                     call.on('error', err => {
                         console.error('Call error:', err);
-                        document.getElementById('host-status').innerText = "Error streaming to device.";
+                        statusEl.innerText = "Error streaming to device.";
+                        statusEl.className = "text-sm text-red-500 font-bold";
                     });
                 });
 
@@ -220,7 +287,6 @@
                     alert("Connection error: " + err.type);
                 });
 
-                // Handle user stopping the screen share via browser UI
                 localStream.getVideoTracks()[0].onended = () => {
                     alert("Screen sharing stopped.");
                     location.reload();
@@ -228,7 +294,7 @@
 
             } catch (err) {
                 console.error("Error sharing screen: ", err);
-                alert("Could not share screen. Please ensure you granted permission.");
+                alert("Could not share screen. Permission denied or not supported.");
                 location.reload();
             }
         }
@@ -242,104 +308,155 @@
             }
 
             const statusEl = document.getElementById('client-status');
-            statusEl.innerText = "Connecting to Host...";
-            statusEl.className = "text-sm text-amber-400 animate-pulse mt-2";
+            statusEl.innerText = "Connecting...";
+            statusEl.className = "text-sm text-amber-400 animate-pulse mt-2 font-bold";
 
-            // Initialize mobile peer (no specific ID needed)
             peer = new Peer(); 
 
             peer.on('open', id => {
-                // 1. Connect to host via Data to signal we are here
                 const conn = peer.connect(targetId);
-
                 conn.on('open', () => {
-                    statusEl.innerText = "Handshake successful. Waiting for video stream...";
+                    statusEl.innerText = "Connected! Awaiting video stream...";
                 });
-
                 conn.on('error', err => {
-                    statusEl.innerText = "Connection failed. Check code.";
-                    statusEl.className = "text-sm text-red-400 mt-2";
+                    statusEl.innerText = "Connection failed. Check the code.";
+                    statusEl.className = "text-sm text-red-400 mt-2 font-bold";
                 });
             });
 
-            // 2. Wait for the Host to call us with the video stream
             peer.on('call', call => {
-                // Answer the call automatically (no stream sent back)
                 call.answer(); 
-                
                 call.on('stream', remoteStream => {
-                    // We received the stream! Transition to VR UI.
                     enterVRMode(remoteStream);
                 });
             });
 
             peer.on('error', err => {
                 statusEl.innerText = "Error: " + err.type;
-                statusEl.className = "text-sm text-red-400 mt-2";
+                statusEl.className = "text-sm text-red-400 mt-2 font-bold";
             });
         }
 
+        // --- VR ENGINE LOGIC --- //
         function enterVRMode(stream) {
-            // Hide Setup UI, Show VR Container
             document.getElementById('screen-client').classList.add('hidden');
             document.getElementById('screen-menu').classList.add('hidden');
-            document.body.style.backgroundColor = 'black'; // Ensure black background
+            document.body.style.backgroundColor = 'black'; 
             
             const vrContainer = document.getElementById('vr-container');
             vrContainer.style.display = 'flex';
 
-            // Feed the same stream to both Left and Right video elements
             const leftVideo = document.getElementById('video-left');
             const rightVideo = document.getElementById('video-right');
             
             leftVideo.srcObject = stream;
             rightVideo.srcObject = stream;
 
-            // Attempt to go fullscreen automatically (requires user gesture, so we try)
+            // Lock orientation to landscape if supported
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(e => console.log("Orientation lock failed:", e));
+            }
+
+            // Attempt Fullscreen
             toggleFullscreen();
 
-            // Wake lock (experimental, prevents screen from sleeping)
+            // Wake lock (prevents screen from sleeping)
             if ('wakeLock' in navigator) {
-                navigator.wakeLock.request('screen').catch(err => console.log('Wake Lock error:', err));
+                navigator.wakeLock.request('screen').catch(e => console.log('Wake Lock error:', e));
             }
+
+            // Initial VR Setup
+            updateVRCalibration();
+            showVRUI(); // Show controls temporarily on start
         }
 
-        // Cross-browser Fullscreen toggle
+        function exitVRMode() {
+            if (document.exitFullscreen) document.exitFullscreen();
+            location.reload(); // Quickest way to clean up WebRTC connections & UI state
+        }
+
+        // Handle Tap to Show/Hide UI
+        document.getElementById('vr-container').addEventListener('click', (e) => {
+            // Don't trigger if they clicked inside the actual UI panel
+            if (e.target.closest('.pointer-events-auto')) return;
+            showVRUI();
+        });
+
+        function showVRUI() {
+            const ui = document.getElementById('vr-ui');
+            ui.style.opacity = '1';
+            ui.style.pointerEvents = 'auto'; // allow clicking buttons
+            
+            clearTimeout(uiTimeout);
+            uiTimeout = setTimeout(() => {
+                ui.style.opacity = '0';
+                ui.style.pointerEvents = 'none'; // pass clicks through to container
+            }, 4000); // Auto hide after 4 seconds
+        }
+
         function toggleFullscreen() {
             let elem = document.documentElement;
-            if (!document.fullscreenElement && !document.mozFullScreenElement &&
-                !document.webkitFullscreenElement && !document.msFullscreenElement) {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
                 if (elem.requestFullscreen) { elem.requestFullscreen(); }
-                else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
-                else if (elem.mozRequestFullScreen) { elem.mozRequestFullScreen(); }
-                else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT); }
+                else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
             } else {
                 if (document.exitFullscreen) { document.exitFullscreen(); }
-                else if (document.msExitFullscreen) { document.msExitFullscreen(); }
-                else if (document.mozCancelFullScreen) { document.mozCancelFullScreen(); }
                 else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
             }
         }
 
-        // VR Calibration Logic
-        let currentZoom = 1.1;
-        let currentIpd = 0;
+        // VR Calibration & Rendering
+        function setVRFormat(format) {
+            vrFormat = format;
+            
+            // Update Toggle Button UI
+            document.getElementById('btn-fmt-2d').className = format === '2d' ? 'px-4 py-2 rounded-md bg-blue-600 text-white font-bold transition-colors' : 'px-4 py-2 rounded-md text-slate-400 hover:text-white font-bold transition-colors';
+            document.getElementById('btn-fmt-sbs').className = format === 'sbs' ? 'px-4 py-2 rounded-md bg-emerald-600 text-white font-bold transition-colors' : 'px-4 py-2 rounded-md text-slate-400 hover:text-white font-bold transition-colors';
+            
+            updateVRCalibration();
+            showVRUI(); // reset timer
+        }
 
         function updateVRCalibration() {
             const leftVideo = document.getElementById('video-left');
             const rightVideo = document.getElementById('video-right');
+            
+            // Base Object-Fit logic for 2D vs SBS 3D
+            if (vrFormat === 'sbs') {
+                // In SBS, the source video has left eye on left half, right eye on right half.
+                // We stretch the video to 200% width, and offset it so each eye only sees its half.
+                leftVideo.style.width = '200%';
+                leftVideo.style.objectPosition = 'left center';
+                
+                rightVideo.style.width = '200%';
+                rightVideo.style.objectPosition = 'right center';
+            } else {
+                // Normal 2D (Duplicate view for both eyes)
+                leftVideo.style.width = '100%';
+                leftVideo.style.objectPosition = 'center center';
+                
+                rightVideo.style.width = '100%';
+                rightVideo.style.objectPosition = 'center center';
+            }
+
+            // Apply Zoom and IPD translation
             leftVideo.style.transform = `scale(${currentZoom}) translateX(${currentIpd}px)`;
             rightVideo.style.transform = `scale(${currentZoom}) translateX(${-currentIpd}px)`;
         }
 
+        // Event Listeners for Sliders
         document.getElementById('zoom-slider').addEventListener('input', (e) => {
-            currentZoom = e.target.value;
+            currentZoom = parseFloat(e.target.value);
+            document.getElementById('lbl-zoom').innerText = currentZoom.toFixed(2) + 'x';
             updateVRCalibration();
+            showVRUI(); 
         });
 
         document.getElementById('ipd-slider').addEventListener('input', (e) => {
-            currentIpd = e.target.value;
+            currentIpd = parseInt(e.target.value);
+            document.getElementById('lbl-ipd').innerText = currentIpd + 'px';
             updateVRCalibration();
+            showVRUI();
         });
     </script>
 </body>
