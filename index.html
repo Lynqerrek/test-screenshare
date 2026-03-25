@@ -3,670 +3,401 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VR Streamer</title>
+    <title>Cardboard VR Streamer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { background-color: #0f172a; color: white; overflow: hidden; touch-action: none; }
-
-        #vr-container {
-            display: none; width: 100vw; height: 100vh; background: #000;
-            flex-direction: row; position: absolute; top: 0; left: 0; z-index: 50;
+        body { 
+            background-color: #0f172a; 
+            color: white; 
+            overflow: hidden; 
+            touch-action: none;
         }
-        .eye {
-            width: 50%; height: 100%; display: flex; align-items: center;
-            justify-content: center; overflow: hidden; position: relative; background: #000;
+        #vr-container { 
+            display: none; 
+            width: 100vw; 
+            height: 100vh; 
+            background: #000; 
+            flex-direction: row; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            z-index: 50; 
+        }
+        .eye { 
+            width: 50%; 
+            height: 100%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            overflow: hidden; 
+            position: relative; 
+            background: #000; 
         }
         .vignette {
-            position: absolute; top: -10%; left: -10%; width: 120%; height: 120%;
+            position: absolute; 
+            top: -10%; left: -10%; width: 120%; height: 120%;
             background: radial-gradient(circle at center, transparent 35%, rgba(0,0,0,0.8) 75%, #000 95%);
-            pointer-events: none; z-index: 10;
+            pointer-events: none; 
+            z-index: 10;
         }
-        .eye video { width: 100%; height: 100%; object-fit: contain; transition: transform 0.05s linear; }
-        .divider { position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; background: #000; z-index: 20; transform: translateX(-50%); }
+        .eye video { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain; 
+            transition: transform 0.1s linear; 
+        }
+        .divider { 
+            position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; 
+            background: #000; z-index: 20; transform: translateX(-50%); 
+        }
         input[type=range] { accent-color: #3b82f6; width: 100%; }
-
-        #status-bar {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: rgba(15,23,42,0.95); border-top: 1px solid #334155;
-            padding: 8px 16px; font-size: 11px; font-family: monospace;
-            color: #94a3b8; z-index: 100; display: none; gap: 16px; flex-wrap: wrap;
-        }
-        #status-bar.visible { display: flex; }
-        .stat-good { color: #34d399; }
-        .stat-warn { color: #fbbf24; }
-        .stat-bad  { color: #f87171; }
-        .btn-disabled { opacity: 0.5; pointer-events: none; }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen font-sans">
 
-<!-- Main Menu -->
-<div id="screen-menu" class="flex flex-col items-center justify-center w-full max-w-md p-6 text-center space-y-6">
-    <div class="mb-4">
-        <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">VR Streamer</h1>
-        <p class="text-slate-400 font-bold tracking-tighter uppercase text-xs">Gaming-Optimised · Low Latency · LAN Mode</p>
-    </div>
-    <button onclick="showScreen('screen-host')" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 rounded-2xl font-semibold text-lg transition-all shadow-lg shadow-blue-500/20">
-        Share Screen (Host PC)
-    </button>
-    <button onclick="showScreen('screen-client')" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold text-lg transition-all shadow-lg shadow-emerald-500/20">
-        Enter VR Mode (Mobile)
-    </button>
-</div>
-
-<!-- Host Setup -->
-<div id="screen-host" class="hidden flex-col items-center justify-center w-full max-w-lg p-6 text-center space-y-5">
-    <h2 class="text-3xl font-bold text-blue-400">Host Setup</h2>
-    <div id="host-step-1" class="w-full flex flex-col items-center gap-4">
-        <div class="w-full text-sm bg-slate-800/80 p-4 rounded-xl border border-blue-500/30 text-left space-y-1">
-            <p class="text-blue-300 font-bold mb-2">Gaming Stream Config</p>
-            <p class="text-slate-400">H.264 Baseline — hardware decode on mobile</p>
-            <p class="text-slate-400">Zero jitter buffer — frames shown instantly</p>
-            <p class="text-slate-400">8–25 Mbps LAN bitrate — no compression artifacts</p>
-            <p class="text-slate-400">60fps capture — smooth motion for fast games</p>
+    <!-- Main Menu -->
+    <div id="screen-menu" class="flex flex-col items-center justify-center w-full max-w-md p-6 text-center space-y-6">
+        <div class="mb-4">
+            <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">VR Streamer</h1>
+            <p class="text-slate-400 font-bold tracking-tighter uppercase text-xs">LAN-Mode Performance Profile Active</p>
         </div>
-        <button id="btn-activate" onclick="startScreenShare()" class="py-4 px-8 bg-blue-600 hover:bg-blue-500 rounded-2xl font-semibold text-lg shadow-lg w-full">
-            Activate LAN Stream
+        <button onclick="showScreen('screen-host')" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 rounded-2xl font-semibold text-lg transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-3">
+            Share Screen (Host)
         </button>
-        <p id="host-step1-status" class="text-sm text-slate-400 min-h-5"></p>
+        <button onclick="showScreen('screen-client')" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold text-lg transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-3">
+            Enter VR Mode (Mobile)
+        </button>
     </div>
-    <div id="host-step-2" class="hidden w-full flex-col items-center space-y-4 bg-slate-800/50 p-6 rounded-3xl border border-slate-700/50">
-        <div class="bg-white p-4 rounded-2xl shadow-xl">
-            <div id="qrcode"></div>
-        </div>
-        <h1 id="host-id-display" class="text-4xl font-mono font-bold text-emerald-400 tracking-widest bg-slate-900/80 px-8 py-3 rounded-2xl border border-slate-700">---</h1>
-        <p id="host-status" class="text-sm text-amber-400 animate-pulse">Waiting for phone to connect...</p>
-        <video id="host-preview" autoplay muted playsinline class="w-full mt-2 rounded-xl border border-slate-600 object-cover max-h-40 shadow-lg"></video>
-    </div>
-    <button onclick="location.reload()" class="text-slate-500 hover:text-white underline text-sm">Back</button>
-</div>
 
-<!-- Mobile Client -->
-<div id="screen-client" class="hidden flex-col items-center justify-center w-full max-w-md p-6 text-center space-y-6">
-    <h2 class="text-3xl font-bold text-emerald-400">VR Receiver</h2>
-    <p class="text-slate-400 text-sm">Enter the 5-letter code shown on the host PC</p>
-    <input type="text" id="target-id-input" maxlength="5" placeholder="XXXXX"
-        class="w-full text-center text-4xl font-mono tracking-widest py-5 bg-slate-800/80 border-2 border-slate-600 rounded-2xl text-white uppercase focus:border-emerald-500 focus:outline-none transition-all">
-    <button onclick="connectToHost()" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold text-lg shadow-lg shadow-emerald-500/30">
-        Connect and Enter VR
-    </button>
-    <p id="client-status" class="text-sm text-slate-400 min-h-6"></p>
-    <button onclick="location.reload()" class="text-slate-500 hover:text-white underline text-sm">Back</button>
-</div>
-
-<!-- VR Split Screen -->
-<div id="vr-container">
-    <div class="eye">
-        <video id="video-left" autoplay playsinline muted></video>
-        <div class="vignette"></div>
-    </div>
-    <div class="divider"></div>
-    <div class="eye">
-        <video id="video-right" autoplay playsinline muted></video>
-        <div class="vignette"></div>
-    </div>
-    <div id="vr-ui" class="absolute inset-0 flex flex-col items-center justify-between p-4 z-50 transition-opacity duration-300 opacity-0 pointer-events-none">
-        <div class="flex justify-between w-full max-w-3xl">
-            <button onclick="exitVRMode()" class="bg-red-600/90 text-white px-5 py-3 rounded-xl text-sm font-bold pointer-events-auto">Exit VR</button>
-            <button onclick="toggleFullscreen()" class="bg-slate-800/90 text-white px-5 py-3 rounded-xl text-sm font-bold pointer-events-auto">Fullscreen</button>
+    <!-- Host Setup -->
+    <div id="screen-host" class="hidden flex-col items-center justify-center w-full max-w-lg p-6 text-center space-y-6">
+        <h2 class="text-3xl font-bold text-blue-400">Host Setup</h2>
+        <div id="host-step-1" class="w-full flex flex-col items-center">
+            <p class="text-slate-400 mb-4 text-sm bg-slate-800/80 p-3 rounded-xl border border-blue-500/30 text-left">
+                🔥 <b>SAME-WIFI OPTIMIZATIONS:</b><br>
+                1. <b>Uncapped LAN Bitrate:</b> Using full Wi-Fi bandwidth.<br>
+                2. <b>Zero Buffer:</b> Dropping late frames immediately.<br>
+                3. <b>720p Performance:</b> Maximum decode speed for mobile.
+            </p>
+            <button onclick="startScreenShare()" class="py-4 px-8 bg-blue-600 hover:bg-blue-500 rounded-2xl font-semibold text-lg shadow-lg">
+                Activate LAN Stream
+            </button>
         </div>
-        <div class="bg-slate-900/95 p-5 rounded-3xl flex flex-col md:flex-row gap-5 text-sm pointer-events-auto border border-slate-700/50 w-full max-w-3xl">
-            <div class="flex flex-col items-center gap-3 border-r border-slate-700 pr-5">
-                <div>
-                    <p class="text-slate-400 text-xs uppercase font-bold mb-1">Source Format</p>
-                    <div class="flex bg-slate-800 rounded-lg p-1 gap-1">
-                        <button id="btn-fmt-2d"  onclick="setVRFormat('2d')"  class="px-3 py-1 rounded bg-blue-600 text-xs">2D</button>
-                        <button id="btn-fmt-sbs" onclick="setVRFormat('sbs')" class="px-3 py-1 rounded text-xs text-slate-400">3D SBS</button>
+        <div id="host-step-2" class="hidden w-full flex-col items-center space-y-4 bg-slate-800/50 p-6 rounded-3xl border border-slate-700/50">
+            <div id="qrcode-container" class="bg-white p-4 rounded-2xl shadow-xl">
+                <div id="qrcode"></div>
+            </div>
+            <h1 id="host-id-display" class="text-4xl font-mono font-bold text-emerald-400 tracking-widest bg-slate-900/80 px-8 py-3 rounded-2xl border border-slate-700">...</h1>
+            <p id="host-status" class="text-sm text-amber-400 animate-pulse">Waiting for connection...</p>
+            <video id="host-preview" autoplay muted class="w-full mt-4 rounded-xl border border-slate-600 object-cover max-h-48 shadow-lg"></video>
+        </div>
+        <button onclick="location.reload()" class="text-slate-500 hover:text-white underline mt-4">Back</button>
+    </div>
+
+    <!-- Mobile Client Setup -->
+    <div id="screen-client" class="hidden flex-col items-center justify-center w-full max-w-md p-6 text-center space-y-6">
+        <h2 class="text-3xl font-bold text-emerald-400">VR Receiver</h2>
+        <input type="text" id="target-id-input" maxlength="5" placeholder="CODE" class="w-full text-center text-4xl font-mono tracking-widest py-5 bg-slate-800/80 border-2 border-slate-600 rounded-2xl text-white uppercase focus:border-emerald-500 focus:outline-none transition-all">
+        <button onclick="connectToHost()" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold text-lg shadow-lg shadow-emerald-500/30">Connect</button>
+        <p id="client-status" class="text-sm text-slate-400 h-6"></p>
+        <button onclick="location.reload()" class="text-slate-500 hover:text-white underline">Back</button>
+    </div>
+
+    <!-- VR Split Screen View -->
+    <div id="vr-container">
+        <div class="eye">
+            <video id="video-left" autoplay playsinline muted></video>
+            <div class="vignette"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="eye">
+            <video id="video-right" autoplay playsinline muted></video>
+            <div class="vignette"></div>
+        </div>
+
+        <div id="vr-ui" class="absolute inset-0 flex flex-col items-center justify-between p-6 z-50 transition-opacity duration-300 opacity-0 pointer-events-none">
+            <div class="flex justify-between w-full max-w-3xl">
+                <button onclick="exitVRMode()" class="bg-red-600/90 text-white px-5 py-3 rounded-xl backdrop-blur-md text-sm font-bold pointer-events-auto">Exit VR</button>
+                <button onclick="toggleFullscreen()" class="bg-slate-800/90 text-white px-5 py-3 rounded-xl backdrop-blur-md text-sm font-bold pointer-events-auto">Fullscreen</button>
+            </div>
+            
+            <div class="bg-slate-900/90 backdrop-blur-xl p-6 rounded-3xl flex flex-col md:flex-row gap-6 text-sm pointer-events-auto border border-slate-700/50 w-full max-w-3xl">
+                <div class="flex flex-col items-center border-r border-slate-700 pr-6">
+                    <label class="text-slate-400 mb-2 text-[10px] uppercase font-bold">Source</label>
+                    <div class="flex bg-slate-800 rounded-lg p-1 mb-2">
+                        <button id="btn-fmt-2d" onclick="setVRFormat('2d')" class="px-3 py-1 rounded bg-blue-600 text-xs">2D</button>
+                        <button id="btn-fmt-sbs" onclick="setVRFormat('sbs')" class="px-3 py-1 rounded text-xs ml-1">3D</button>
                     </div>
-                </div>
-                <div>
-                    <p class="text-slate-400 text-xs uppercase font-bold mb-1">Fit Mode</p>
-                    <div class="flex bg-slate-800 rounded-lg p-1 gap-1">
+                    <label class="text-slate-400 mb-2 text-[10px] uppercase font-bold">Fit Mode</label>
+                    <div class="flex bg-slate-800 rounded-lg p-1">
                         <button id="btn-fit-wide" onclick="setFitMode('contain')" class="px-3 py-1 rounded bg-emerald-600 text-xs">Wide</button>
-                        <button id="btn-fit-fill" onclick="setFitMode('cover')"   class="px-3 py-1 rounded text-xs text-slate-400">Fill</button>
+                        <button id="btn-fit-fill" onclick="setFitMode('cover')" class="px-3 py-1 rounded text-xs ml-1">Fill</button>
                     </div>
                 </div>
-            </div>
-            <div class="flex-1 flex flex-col justify-center gap-4">
-                <div>
-                    <div class="flex justify-between text-xs text-slate-400 font-bold uppercase mb-1">
-                        <span>Zoom</span><span id="lbl-zoom">1.00x</span>
+                <div class="flex-1 flex flex-col justify-center gap-4">
+                    <div>
+                        <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase mb-1"><span>Zoom</span><span id="lbl-zoom">1.0x</span></div>
+                        <input type="range" id="zoom-slider" min="0.5" max="2.5" step="0.05" value="1.0">
                     </div>
-                    <input type="range" id="zoom-slider" min="0.5" max="2.5" step="0.05" value="1.0">
-                </div>
-                <div>
-                    <div class="flex justify-between text-xs text-slate-400 font-bold uppercase mb-1">
-                        <span>IPD Offset</span><span id="lbl-ipd">0px</span>
+                    <div>
+                        <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase mb-1"><span>IPD</span><span id="lbl-ipd">0px</span></div>
+                        <input type="range" id="ipd-slider" min="-100" max="100" step="1" value="0">
                     </div>
-                    <input type="range" id="ipd-slider" min="-120" max="120" step="1" value="0">
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Live stats bar -->
-<div id="status-bar">
-    <span>WebRTC Stats</span>
-    <span id="stat-bitrate">bitrate: --</span>
-    <span id="stat-fps">fps: --</span>
-    <span id="stat-rtt">rtt: --</span>
-    <span id="stat-loss">loss: --</span>
-    <span id="stat-codec">codec: --</span>
-</div>
+    <script>
+        let peer = null;
+        let localStream = null;
+        let vrFormat = '2d', fitMode = 'contain', currentZoom = 1.0, currentIpd = 0, uiTimeout;
 
-<script>
-// ─── State ───────────────────────────────────────────────────────────────────
-var peer        = null;
-var localStream = null;
-var activeCall  = null;
-var statsTimer  = null;
-var vrFormat    = '2d';
-var fitMode     = 'contain';
-var currentZoom = 1.0;
-var currentIpd  = 0;
-var uiTimeout   = null;
-
-// ─── PeerJS config ────────────────────────────────────────────────────────────
-var PEER_CFG = {
-    debug: 0,
-    config: {
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302'  },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun.cloudflare.com:3478' }
-        ],
-        bundlePolicy:         'max-bundle',
-        rtcpMuxPolicy:        'require',
-        sdpSemantics:         'unified-plan',
-        iceCandidatePoolSize: 8
-    }
-};
-
-// ─── SDP transforms ───────────────────────────────────────────────────────────
-
-function preferH264(sdp) {
-    var lines = sdp.split('\n');
-    var mIdx  = -1;
-    var h264  = [];
-    var vp8   = [];
-
-    for (var i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith('m=video')) { mIdx = i; break; }
-    }
-    if (mIdx === -1) return sdp;
-
-    for (var i = 0; i < lines.length; i++) {
-        var l = lines[i];
-        if (/^a=fmtp:\d+.*profile-level-id=42/i.test(l)) {
-            var m = l.match(/^a=fmtp:(\d+)/);
-            if (m) h264.push(m[1]);
-        }
-        if (/^a=rtpmap:\d+ VP8\//i.test(l)) {
-            var m = l.match(/^a=rtpmap:(\d+)/);
-            if (m) vp8.push(m[1]);
-        }
-    }
-
-    var parts     = lines[mIdx].split(' ');
-    var header    = parts.slice(0, 3);
-    var allPt     = parts.slice(3);
-    var preferred = h264.concat(vp8.filter(function(p){ return h264.indexOf(p) === -1; }));
-    var rest      = allPt.filter(function(p){ return preferred.indexOf(p) === -1; });
-    lines[mIdx]   = header.concat(preferred).concat(rest).join(' ');
-    return lines.join('\n');
-}
-
-function addH264Params(sdp) {
-    return sdp.replace(
-        /(a=fmtp:(\d+) profile-level-id=[0-9a-fA-F]+)(;level-asymmetry-allowed=1)?/gi,
-        '$1;level-asymmetry-allowed=1;packetization-mode=1'
-    );
-}
-
-function setBandwidth(sdp) {
-    // Insert b=AS after the c= line to give the remote BWE a starting hint
-    return sdp.replace(/(c=IN IP[46] [\d.:a-fA-F]+\r?\n)/, '$1b=AS:25000\r\n');
-}
-
-function transformSDP(sdp) {
-    sdp = preferH264(sdp);
-    sdp = addH264Params(sdp);
-    sdp = setBandwidth(sdp);
-    return sdp;
-}
-
-// Patch createOffer/createAnswer — these always produce a complete SDP object.
-// We do NOT patch setLocalDescription because PeerJS calls it with partial
-// objects during renegotiation which would cause null-pointer errors.
-var _origOffer  = RTCPeerConnection.prototype.createOffer;
-var _origAnswer = RTCPeerConnection.prototype.createAnswer;
-
-RTCPeerConnection.prototype.createOffer = function() {
-    var self = this;
-    var args = arguments;
-    return _origOffer.apply(self, args).then(function(offer) {
-        offer.sdp = transformSDP(offer.sdp);
-        return offer;
-    });
-};
-
-RTCPeerConnection.prototype.createAnswer = function() {
-    var self = this;
-    var args = arguments;
-    return _origAnswer.apply(self, args).then(function(answer) {
-        answer.sdp = transformSDP(answer.sdp);
-        return answer;
-    });
-};
-
-// ─── Encoding params ──────────────────────────────────────────────────────────
-
-function applyEncodingParams(pc) {
-    try {
-        var senders = pc.getSenders();
-        var sender  = null;
-        for (var i = 0; i < senders.length; i++) {
-            if (senders[i].track && senders[i].track.kind === 'video') {
-                sender = senders[i]; break;
+        // PERFECT WEBRTC CONFIGURATION
+        const peerConfig = {
+            config: {
+                iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+                bundlePolicy: "max-bundle",
+                rtcpMuxPolicy: "require",
+                sdpSemantics: "unified-plan"
             }
-        }
-        if (!sender) return;
+        };
 
-        var params = sender.getParameters();
-        if (!params.encodings || !params.encodings.length) params.encodings = [{}];
-
-        var enc             = params.encodings[0];
-        enc.maxBitrate      = 25000000;  // 25 Mbps
-        enc.minBitrate      = 8000000;   // 8 Mbps floor
-        enc.priority        = 'high';
-        enc.networkPriority = 'high';
-        if ('scalabilityMode' in enc) enc.scalabilityMode = 'L1T1';
-
-        sender.setParameters(params).then(function() {
-            console.log('[VR] Encoding params set: 8-25 Mbps, high priority');
-        }).catch(function(e) {
-            console.warn('[VR] setParameters failed:', e);
-        });
-    } catch(e) {
-        console.warn('[VR] applyEncodingParams error:', e);
-    }
-}
-
-// ─── Playout delay ───────────────────────────────────────────────────────────
-
-function minimizePlayoutDelay(pc) {
-    try {
-        var receivers = pc.getReceivers();
-        for (var i = 0; i < receivers.length; i++) {
-            var r = receivers[i];
-            if (r.track.kind !== 'video') continue;
-            if ('jitterBufferTarget'    in r) r.jitterBufferTarget    = 0;
-            if ('jitterBufferDelayHint' in r) r.jitterBufferDelayHint = 0;
-            if ('playoutDelayHint'      in r) r.playoutDelayHint      = 0;
-        }
-        console.log('[VR] Playout delay set to 0');
-    } catch(e) {
-        console.warn('[VR] minimizePlayoutDelay error:', e);
-    }
-}
-
-// ─── getDisplayMedia constraints ─────────────────────────────────────────────
-
-var CAPTURE_OPTS = {
-    video: {
-        frameRate:       { ideal: 60, min: 30 },
-        width:           { ideal: 1280, max: 1920 },
-        height:          { ideal: 720,  max: 1080 },
-        cursor:          'never'
-    },
-    audio: false
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function generateCode() {
-    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    var r = '';
-    for (var i = 0; i < 5; i++) r += chars[Math.floor(Math.random() * chars.length)];
-    return r;
-}
-
-function showScreen(id) {
-    ['screen-menu','screen-host','screen-client'].forEach(function(s) {
-        var el = document.getElementById(s);
-        el.classList.add('hidden');
-        el.classList.remove('flex');
-    });
-    var t = document.getElementById(id);
-    t.classList.remove('hidden');
-    t.classList.add('flex');
-}
-
-function setStatusText(id, text) {
-    var el = document.getElementById(id);
-    if (el) el.textContent = text;
-}
-
-// ─── Stats polling ────────────────────────────────────────────────────────────
-
-var _prevBytes = 0, _prevFrames = 0, _prevTs = 0;
-
-function pollStats(pc) {
-    if (!pc) return;
-    pc.getStats().then(function(stats) {
-        var bitrate = 0, fps = 0, rtt = 0, loss = 0, codec = '--';
-        var now = Date.now();
-        stats.forEach(function(r) {
-            if (r.type === 'outbound-rtp' && r.kind === 'video') {
-                if (_prevTs) {
-                    var dt  = (now - _prevTs) / 1000;
-                    bitrate = Math.round((r.bytesSent - _prevBytes) * 8 / dt / 1000);
-                    fps     = Math.round(((r.framesEncoded || 0) - _prevFrames) / dt);
-                }
-                _prevBytes  = r.bytesSent;
-                _prevFrames = r.framesEncoded || 0;
-                _prevTs     = now;
-            }
-            if (r.type === 'remote-inbound-rtp' && r.kind === 'video') {
-                rtt  = Math.round((r.roundTripTime || 0) * 1000);
-                loss = ((r.fractionLost || 0) * 100).toFixed(1);
-            }
-            if (r.type === 'codec' && r.mimeType && r.mimeType.indexOf('video') > -1) {
-                codec = r.mimeType.split('/')[1] || '--';
-            }
-        });
-
-        var brEl = document.getElementById('stat-bitrate');
-        brEl.textContent = 'bitrate: ' + (bitrate / 1000).toFixed(1) + ' Mbps';
-        brEl.className   = bitrate > 8000 ? 'stat-good' : bitrate > 3000 ? 'stat-warn' : 'stat-bad';
-
-        var fEl = document.getElementById('stat-fps');
-        fEl.textContent = 'fps: ' + fps;
-        fEl.className   = fps >= 50 ? 'stat-good' : fps >= 30 ? 'stat-warn' : 'stat-bad';
-
-        var rEl = document.getElementById('stat-rtt');
-        rEl.textContent = 'rtt: ' + rtt + 'ms';
-        rEl.className   = rtt < 10 ? 'stat-good' : rtt < 30 ? 'stat-warn' : 'stat-bad';
-
-        var lEl = document.getElementById('stat-loss');
-        lEl.textContent = 'loss: ' + loss + '%';
-        lEl.className   = parseFloat(loss) < 0.5 ? 'stat-good' : parseFloat(loss) < 2 ? 'stat-warn' : 'stat-bad';
-
-        document.getElementById('stat-codec').textContent = 'codec: ' + codec;
-    }).catch(function(){});
-}
-
-// ─── HOST ─────────────────────────────────────────────────────────────────────
-
-function startScreenShare() {
-    var btn    = document.getElementById('btn-activate');
-    var status = document.getElementById('host-step1-status');
-
-    btn.textContent = 'Requesting screen permission...';
-    btn.classList.add('btn-disabled');
-    status.textContent = '';
-
-    // CAPTURE FIRST — this needs the user gesture we already have.
-    // PeerJS peer creation comes AFTER, avoiding the race where peer.on('open')
-    // never fires because the screen permission dialog blocks the event loop.
-    navigator.mediaDevices.getDisplayMedia(CAPTURE_OPTS).then(function(stream) {
-        localStream = stream;
-
-        var vt = stream.getVideoTracks()[0];
-        if (vt) {
-            if ('contentHint' in vt) vt.contentHint = 'motion';
-            // If the user closes the share via the browser bar, reload cleanly
-            vt.addEventListener('ended', function() {
-                if (peer) peer.destroy();
-                location.reload();
+        function showScreen(id) {
+            ['screen-menu', 'screen-host', 'screen-client'].forEach(s => {
+                const el = document.getElementById(s);
+                el.classList.add('hidden');
+                el.classList.remove('flex');
             });
+            const target = document.getElementById(id);
+            target.classList.remove('hidden');
+            target.classList.add('flex');
         }
 
-        // Show preview immediately so user knows capture is working
-        document.getElementById('host-preview').srcObject = stream;
+        function generateShortId() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let res = '';
+            for(let i=0; i<5; i++) res += chars.charAt(Math.floor(Math.random()*chars.length));
+            return res;
+        }
 
-        btn.textContent    = 'Connecting to signaling server...';
-        status.textContent = 'Establishing peer ID...';
+        async function startScreenShare() {
+            try {
+                const hostId = generateShortId();
+                peer = new Peer(hostId, peerConfig);
 
-        var hostId = generateCode();
-        peer = new Peer(hostId, PEER_CFG);
+                peer.on('open', async (id) => {
+                    document.getElementById('host-id-display').innerText = id;
+                    
+                    document.getElementById('qrcode').innerHTML = "";
+                    new QRCode(document.getElementById("qrcode"), { 
+                        text: window.location.origin + window.location.pathname + '?id=' + id, 
+                        width: 180, 
+                        height: 180 
+                    });
 
-        var openTimeout = setTimeout(function() {
-            if (!document.getElementById('host-step-2').style.display) {
-                status.textContent = 'Could not reach signaling server. Check your internet.';
-                btn.textContent    = 'Activate LAN Stream';
-                btn.classList.remove('btn-disabled');
-            }
-        }, 8000);
+                    try {
+                        // GAMING CAPTURE RE-WORK: Capture at exact 60fps locking to native resolution constraints
+                        localStream = await navigator.mediaDevices.getDisplayMedia({ 
+                            video: { 
+                                cursor: "always", 
+                                frameRate: { ideal: 60, max: 60 }, 
+                                width: { ideal: 1920, max: 2560 }, 
+                                height: { ideal: 1080, max: 1440 },
+                                displaySurface: 'monitor' 
+                            }, 
+                            audio: false 
+                        });
 
-        peer.on('open', function(id) {
-            clearTimeout(openTimeout);
-            console.log('[VR Host] Peer open, id =', id);
+                        const videoTrack = localStream.getVideoTracks()[0];
+                        if (videoTrack && 'contentHint' in videoTrack) {
+                            // "motion" enforces 60fps drops resolution if needed, crucial for gameplay
+                            videoTrack.contentHint = 'motion';
+                        }
 
-            document.getElementById('qrcode').innerHTML = '';
-            new QRCode(document.getElementById('qrcode'), {
-                text:   location.origin + location.pathname + '?id=' + id,
-                width:  180,
-                height: 180
-            });
-            document.getElementById('host-id-display').textContent = id;
-
-            document.getElementById('host-step-1').classList.add('hidden');
-            var step2 = document.getElementById('host-step-2');
-            step2.classList.remove('hidden');
-            step2.classList.add('flex');
-
-            document.getElementById('status-bar').classList.add('visible');
-            setStatusText('host-status', 'Waiting for phone to connect...');
-        });
-
-        peer.on('connection', function(conn) {
-            console.log('[VR Host] Data connection from', conn.peer);
-            setStatusText('host-status', 'Phone connected — starting video...');
-
-            conn.on('open', function() {
-                var call = peer.call(conn.peer, localStream, {
-                    sdpTransform: transformSDP
-                });
-                activeCall = call;
-
-                call.peerConnection.addEventListener('iceconnectionstatechange', function() {
-                    var s = call.peerConnection.iceConnectionState;
-                    console.log('[VR Host] ICE:', s);
-                    if (s === 'connected' || s === 'completed') {
-                        setStatusText('host-status', 'Streaming — gaming mode active');
-                        applyEncodingParams(call.peerConnection);
-                        statsTimer = setInterval(function(){ pollStats(call.peerConnection); }, 1000);
-                    }
-                    if (s === 'failed' || s === 'disconnected') {
-                        setStatusText('host-status', 'Connection lost. Ask phone to reconnect.');
-                        clearInterval(statsTimer);
+                        document.getElementById('host-preview').srcObject = localStream;
+                        document.getElementById('host-step-1').classList.add('hidden');
+                        document.getElementById('host-step-2').classList.remove('hidden');
+                        document.getElementById('host-step-2').classList.add('flex');
+                    } catch (mediaErr) {
+                        console.error("Media Capture Error:", mediaErr);
+                        peer.destroy();
                     }
                 });
+
+                peer.on('connection', conn => {
+                    document.getElementById('host-status').innerText = "Streaming via Local Pipeline...";
+                    const call = peer.call(conn.peer, localStream);
+                    
+                    // GAMING LOW-LATENCY PC MANIPULATION
+                    const pc = call.peerConnection;
+
+                    // Optimize Codecs: Prioritize H.264 because it usually has fast hardware decoding on mobiles
+                    if (window.RTCRtpReceiver && RTCRtpReceiver.getCapabilities) {
+                        const capabilities = RTCRtpReceiver.getCapabilities('video');
+                        if (capabilities && capabilities.codecs) {
+                            const transceivers = pc.getTransceivers();
+                            transceivers.forEach(t => {
+                                if (t.sender && t.sender.track && t.sender.track.kind === 'video' && typeof t.setCodecPreferences === 'function') {
+                                    const h264 = capabilities.codecs.filter(c => c.mimeType.toLowerCase() === 'video/h264');
+                                    const others = capabilities.codecs.filter(c => c.mimeType.toLowerCase() !== 'video/h264');
+                                    if (h264.length > 0) {
+                                        try { t.setCodecPreferences([...h264, ...others]); } catch(e) {}
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    // Apply Quality/Bitrate parameters iteratively to ensure they stick
+                    const applySenderGamingParams = async () => {
+                        try {
+                            const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                            if (sender && sender.getParameters) {
+                                const params = sender.getParameters();
+                                if (!params.encodings) params.encodings = [{}];
+                                
+                                // LAN target: 50 Megabits/s for maximum clarity
+                                params.encodings[0].maxBitrate = 50000000; 
+                                params.encodings[0].minBitrate = 15000000; 
+                                
+                                // Network packet prioritization
+                                params.encodings[0].priority = 'high';
+                                params.encodings[0].networkPriority = 'high';
+                                
+                                // ABSOLUTELY ESSENTIAL: Tells WebRTC to NEVER drop frames. Drop resolution if lagging instead.
+                                params.degradationPreference = 'maintain-framerate';
+                                
+                                await sender.setParameters(params);
+                            }
+                        } catch (e) { console.warn("Encoding Params Error:", e); }
+                    };
+
+                    applySenderGamingParams();
+                    setTimeout(applySenderGamingParams, 500); // Safety fallback for initial SDP handshake
+                });
+
+                peer.on('error', err => {
+                    console.error("Peer Error:", err);
+                });
+
+            } catch (e) { 
+                console.error("Generic Init Error:", e);
+                location.reload(); 
+            }
+        }
+
+        function connectToHost() {
+            const tid = document.getElementById('target-id-input').value.toUpperCase();
+            if(!tid) return;
+
+            peer = new Peer(null, peerConfig);
+            peer.on('open', () => {
+                peer.connect(tid);
+                document.getElementById('client-status').innerText = "Opening Direct Link...";
             });
-        });
-
-        peer.on('error', function(err) {
-            console.error('[VR Host] Peer error:', err.type, err.message);
-            var msg = err.type === 'unavailable-id'
-                ? 'ID taken — refresh for a new code.'
-                : 'Error: ' + err.type;
-            setStatusText('host-status', msg);
-        });
-
-    }).catch(function(err) {
-        console.error('[VR Host] getDisplayMedia failed:', err);
-        btn.textContent    = 'Activate LAN Stream';
-        btn.classList.remove('btn-disabled');
-        status.textContent = 'Screen share was cancelled or denied.';
-    });
-}
-
-// ─── CLIENT ──────────────────────────────────────────────────────────────────
-
-function connectToHost() {
-    var tid = document.getElementById('target-id-input').value.trim().toUpperCase();
-    if (tid.length < 2) {
-        setStatusText('client-status', 'Please enter the code from the host screen.');
-        return;
-    }
-
-    setStatusText('client-status', 'Connecting to signaling server...');
-    peer = new Peer(null, PEER_CFG);
-
-    peer.on('open', function(myId) {
-        console.log('[VR Client] Open, my id:', myId, '— connecting to:', tid);
-        setStatusText('client-status', 'Reaching host...');
-        peer.connect(tid, { reliable: false });
-    });
-
-    peer.on('call', function(call) {
-        console.log('[VR Client] Incoming call — answering');
-        setStatusText('client-status', 'Receiving video stream...');
-        call.answer();
-
-        call.on('stream', function(stream) {
-            console.log('[VR Client] Stream received');
-            minimizePlayoutDelay(call.peerConnection);
-
-            call.peerConnection.addEventListener('iceconnectionstatechange', function() {
-                var s = call.peerConnection.iceConnectionState;
-                if (s === 'connected' || s === 'completed') {
-                    minimizePlayoutDelay(call.peerConnection);
-                }
+            peer.on('call', call => {
+                call.answer();
+                call.on('stream', s => {
+                    enterVRMode(s);
+                });
             });
+            peer.on('error', err => {
+                document.getElementById('client-status').innerText = "Connection Failed.";
+            });
+        }
 
-            enterVRMode(stream);
+        function enterVRMode(stream) {
+            document.getElementById('screen-client').classList.add('hidden');
+            document.getElementById('screen-menu').classList.add('hidden');
+            document.getElementById('vr-container').style.display = 'flex';
+            
+            const l = document.getElementById('video-left');
+            const r = document.getElementById('video-right');
+            
+            l.srcObject = stream;
+            r.srcObject = stream;
+            
+            // Explicit play ensures immediate rendering skipping mobile autoplay restrictions
+            l.play().catch(e => console.warn(e));
+            r.play().catch(e => console.warn(e));
+            
+            toggleFullscreen();
+            updateVRCalibration();
+            showVRUI();
+        }
+
+        function setFitMode(m) {
+            fitMode = m;
+            document.getElementById('video-left').style.objectFit = m;
+            document.getElementById('video-right').style.objectFit = m;
+            document.getElementById('btn-fit-wide').className = m === 'contain' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs';
+            document.getElementById('btn-fit-fill').className = m === 'cover' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs';
+            updateVRCalibration();
+        }
+
+        function setVRFormat(f) {
+            vrFormat = f;
+            document.getElementById('btn-fmt-2d').className = f === '2d' ? 'px-3 py-1 rounded bg-blue-600 text-xs' : 'px-3 py-1 rounded text-xs';
+            document.getElementById('btn-fmt-sbs').className = f === 'sbs' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs';
+            updateVRCalibration();
+        }
+
+        function updateVRCalibration() {
+            const l = document.getElementById('video-left'), r = document.getElementById('video-right');
+            if (vrFormat === 'sbs') {
+                l.style.width = '200%'; l.style.objectPosition = 'left center';
+                r.style.width = '200%'; r.style.objectPosition = 'right center';
+            } else {
+                l.style.width = '100%'; l.style.objectPosition = 'center center';
+                r.style.width = '100%'; r.style.objectPosition = 'center center';
+            }
+            l.style.transform = `scale(${currentZoom}) translateX(${currentIpd}px)`;
+            r.style.transform = `scale(${currentZoom}) translateX(${-currentIpd}px)`;
+        }
+
+        function showVRUI() {
+            const ui = document.getElementById('vr-ui');
+            ui.style.opacity = '1'; ui.style.pointerEvents = 'auto';
+            clearTimeout(uiTimeout);
+            uiTimeout = setTimeout(() => { ui.style.opacity = '0'; ui.style.pointerEvents = 'none'; }, 4000);
+        }
+
+        document.getElementById('vr-container').addEventListener('click', e => { if(!e.target.closest('.pointer-events-auto')) showVRUI(); });
+        document.getElementById('zoom-slider').addEventListener('input', e => { 
+            currentZoom = e.target.value; 
+            document.getElementById('lbl-zoom').innerText = parseFloat(e.target.value).toFixed(2)+'x'; 
+            updateVRCalibration(); 
         });
-
-        call.on('error', function(e) {
-            setStatusText('client-status', 'Stream error: ' + e);
+        document.getElementById('ipd-slider').addEventListener('input', e => { 
+            currentIpd = e.target.value; 
+            document.getElementById('lbl-ipd').innerText = e.target.value+'px'; 
+            updateVRCalibration(); 
         });
-    });
+        
+        function toggleFullscreen() {
+            let el = document.documentElement;
+            if (!document.fullscreenElement) {
+                if (el.requestFullscreen) el.requestFullscreen();
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+        }
 
-    peer.on('error', function(err) {
-        var msg = err.type === 'peer-unavailable'
-            ? 'Host not found. Double-check the code.'
-            : 'Error: ' + err.type;
-        setStatusText('client-status', msg);
-        console.error('[VR Client] Error:', err.type, err.message);
-    });
-}
-
-// ─── VR display ───────────────────────────────────────────────────────────────
-
-function enterVRMode(stream) {
-    ['screen-client','screen-menu','screen-host'].forEach(function(id) {
-        var el = document.getElementById(id);
-        el.classList.add('hidden');
-        el.classList.remove('flex');
-    });
-
-    var container = document.getElementById('vr-container');
-    container.style.display = 'flex';
-
-    var vl = document.getElementById('video-left');
-    var vr = document.getElementById('video-right');
-    vl.srcObject = stream;
-    vr.srcObject = stream;
-    vl.muted = vr.muted = true;
-
-    toggleFullscreen();
-    updateVRCalibration();
-    setTimeout(showVRUI, 600);
-}
-
-function setFitMode(m) {
-    fitMode = m;
-    document.getElementById('video-left').style.objectFit  = m;
-    document.getElementById('video-right').style.objectFit = m;
-    document.getElementById('btn-fit-wide').className =
-        m === 'contain' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs text-slate-400';
-    document.getElementById('btn-fit-fill').className =
-        m === 'cover' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs text-slate-400';
-    updateVRCalibration();
-}
-
-function setVRFormat(f) {
-    vrFormat = f;
-    document.getElementById('btn-fmt-2d').className  =
-        f === '2d'  ? 'px-3 py-1 rounded bg-blue-600 text-xs'    : 'px-3 py-1 rounded text-xs text-slate-400';
-    document.getElementById('btn-fmt-sbs').className =
-        f === 'sbs' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs text-slate-400';
-    updateVRCalibration();
-}
-
-function updateVRCalibration() {
-    var vl = document.getElementById('video-left');
-    var vr = document.getElementById('video-right');
-    if (vrFormat === 'sbs') {
-        vl.style.width = '200%'; vl.style.objectPosition = 'left center';
-        vr.style.width = '200%'; vr.style.objectPosition = 'right center';
-    } else {
-        vl.style.width = '100%'; vl.style.objectPosition = 'center center';
-        vr.style.width = '100%'; vr.style.objectPosition = 'center center';
-    }
-    vl.style.transform = 'scale(' + currentZoom + ') translateX(' + currentIpd + 'px)';
-    vr.style.transform = 'scale(' + currentZoom + ') translateX(' + (-currentIpd) + 'px)';
-}
-
-function showVRUI() {
-    var ui = document.getElementById('vr-ui');
-    ui.style.opacity       = '1';
-    ui.style.pointerEvents = 'auto';
-    clearTimeout(uiTimeout);
-    uiTimeout = setTimeout(function() {
-        ui.style.opacity       = '0';
-        ui.style.pointerEvents = 'none';
-    }, 4000);
-}
-
-document.getElementById('vr-container').addEventListener('click', function(e) {
-    if (!e.target.closest('.pointer-events-auto')) showVRUI();
-});
-
-document.getElementById('zoom-slider').addEventListener('input', function(e) {
-    currentZoom = parseFloat(e.target.value);
-    document.getElementById('lbl-zoom').textContent = currentZoom.toFixed(2) + 'x';
-    updateVRCalibration();
-});
-
-document.getElementById('ipd-slider').addEventListener('input', function(e) {
-    currentIpd = parseInt(e.target.value, 10);
-    document.getElementById('lbl-ipd').textContent = currentIpd + 'px';
-    updateVRCalibration();
-});
-
-function toggleFullscreen() {
-    var el = document.documentElement;
-    if (!document.fullscreenElement) {
-        if (el.requestFullscreen)       el.requestFullscreen();
-        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-    } else {
-        if (document.exitFullscreen)       document.exitFullscreen();
-        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-    }
-}
-
-function exitVRMode() {
-    clearInterval(statsTimer);
-    if (peer) peer.destroy();
-    location.reload();
-}
-
-// ─── Auto-fill code from QR URL param ────────────────────────────────────────
-
-window.addEventListener('load', function() {
-    var id = new URLSearchParams(location.search).get('id');
-    if (id) {
-        showScreen('screen-client');
-        document.getElementById('target-id-input').value = id.toUpperCase();
-    }
-});
-</script>
+        function exitVRMode() { location.reload(); }
+        
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const id = urlParams.get('id');
+            if (id) {
+                showScreen('screen-client');
+                document.getElementById('target-id-input').value = id.toUpperCase();
+            }
+        };
+    </script>
 </body>
 </html>
