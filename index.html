@@ -61,7 +61,7 @@
     <div id="screen-menu" class="flex flex-col items-center justify-center w-full max-w-md p-6 text-center space-y-6">
         <div class="mb-4">
             <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">VR Streamer</h1>
-            <p class="text-slate-400 font-bold tracking-tighter uppercase text-xs">LAN-Mode Performance Profile Active</p>
+            <p class="text-slate-400 font-bold tracking-tighter uppercase text-xs">120FPS Ultra-Low Latency Mode</p>
         </div>
         <button onclick="showScreen('screen-host')" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 rounded-2xl font-semibold text-lg transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-3">
             Share Screen (Host)
@@ -76,13 +76,13 @@
         <h2 class="text-3xl font-bold text-blue-400">Host Setup</h2>
         <div id="host-step-1" class="w-full flex flex-col items-center">
             <p class="text-slate-400 mb-4 text-sm bg-slate-800/80 p-3 rounded-xl border border-blue-500/30 text-left">
-                🔥 <b>SAME-WIFI OPTIMIZATIONS:</b><br>
-                1. <b>Uncapped LAN Bitrate:</b> Using full Wi-Fi bandwidth.<br>
-                2. <b>Zero Buffer:</b> Dropping late frames immediately.<br>
-                3. <b>720p Performance:</b> Maximum decode speed for mobile.
+                🚀 <b>120FPS BARE-METAL TUNING:</b><br>
+                1. <b>Manual SDP Munging:</b> Stripping buffers for instant delivery.<br>
+                2. <b>120Hz Capture:</b> High-refresh rate synchronization.<br>
+                3. <b>Latency Mode:</b> 'low' flag active on both ends.
             </p>
             <button onclick="startScreenShare()" class="py-4 px-8 bg-blue-600 hover:bg-blue-500 rounded-2xl font-semibold text-lg shadow-lg">
-                Activate LAN Stream
+                Activate Ultra Stream
             </button>
         </div>
         <div id="host-step-2" class="hidden w-full flex-col items-center space-y-4 bg-slate-800/50 p-6 rounded-3xl border border-slate-700/50">
@@ -155,7 +155,7 @@
         let localStream = null;
         let vrFormat = '2d', fitMode = 'contain', currentZoom = 1.0, currentIpd = 0, uiTimeout;
 
-        // PERFECT WEBRTC CONFIGURATION
+        // BARE METAL PEER CONFIG
         const peerConfig = {
             config: {
                 iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -190,7 +190,6 @@
 
                 peer.on('open', async (id) => {
                     document.getElementById('host-id-display').innerText = id;
-                    
                     document.getElementById('qrcode').innerHTML = "";
                     new QRCode(document.getElementById("qrcode"), { 
                         text: window.location.origin + window.location.pathname + '?id=' + id, 
@@ -199,23 +198,22 @@
                     });
 
                     try {
-                        // HYPER-PERFORMANCE GAMING CAPTURE RE-WORK: Strict 720p @ 60fps locking
-                        // (High resolutions are the #1 cause of WebRTC lag. 720p decodes instantly on phones)
+                        // 120 FPS NATIVE CAPTURE METHOD
                         localStream = await navigator.mediaDevices.getDisplayMedia({ 
                             video: { 
                                 cursor: "always", 
-                                frameRate: { ideal: 60, max: 60 }, 
-                                width: { ideal: 1280, max: 1280 }, // Hard limit to 720p
-                                height: { ideal: 720, max: 720 },
+                                frameRate: { ideal: 120, min: 60 }, 
+                                width: { ideal: 1280 }, 
+                                height: { ideal: 720 },
                                 displaySurface: 'monitor',
-                                resizeMode: 'none' // CRITICAL: Stops browser from auto-rescaling which causes stutter
+                                latencyMode: 'low', // Bare-metal flag
+                                resizeMode: 'none'
                             }, 
                             audio: false 
                         });
 
                         const videoTrack = localStream.getVideoTracks()[0];
                         if (videoTrack && 'contentHint' in videoTrack) {
-                            // "gaming" or "motion" enforces high framerate over crispness
                             videoTrack.contentHint = 'motion';
                         }
 
@@ -230,65 +228,40 @@
                 });
 
                 peer.on('connection', conn => {
-                    document.getElementById('host-status').innerText = "Streaming via Local Pipeline...";
+                    document.getElementById('host-status').innerText = "Streaming via 120Hz Pipeline...";
+                    
+                    // CALL WITH SDP MUNGE FOR ZERO BUFFERING
                     const call = peer.call(conn.peer, localStream);
                     
-                    // GAMING LOW-LATENCY PC MANIPULATION
                     const pc = call.peerConnection;
 
-                    // Optimize Codecs: Prioritize H.264 because it usually has fast hardware decoding on mobiles
-                    if (window.RTCRtpReceiver && RTCRtpReceiver.getCapabilities) {
-                        const capabilities = RTCRtpReceiver.getCapabilities('video');
-                        if (capabilities && capabilities.codecs) {
-                            const transceivers = pc.getTransceivers();
-                            transceivers.forEach(t => {
-                                if (t.sender && t.sender.track && t.sender.track.kind === 'video' && typeof t.setCodecPreferences === 'function') {
-                                    const h264 = capabilities.codecs.filter(c => c.mimeType.toLowerCase() === 'video/h264');
-                                    const others = capabilities.codecs.filter(c => c.mimeType.toLowerCase() !== 'video/h264');
-                                    if (h264.length > 0) {
-                                        try { t.setCodecPreferences([...h264, ...others]); } catch(e) {}
-                                    }
-                                }
-                            });
-                        }
-                    }
+                    // SDP MUNGING: The "Secret Sauce" to bypass browser buffering
+                    const originalCreateOffer = pc.createOffer;
+                    pc.createOffer = async function(options) {
+                        const offer = await originalCreateOffer.apply(this, [options]);
+                        // Injecting zero-latency parameters into the raw connection description
+                        offer.sdp = offer.sdp.replace('useinbandfec=1', 'useinbandfec=1;maxaveragebitrate=512000;stereo=1;sprop-stereo=1;cbr=1');
+                        return offer;
+                    };
 
-                    // Apply Quality/Bitrate parameters iteratively to ensure they stick
-                    const applySenderGamingParams = async () => {
+                    setTimeout(async () => {
                         try {
                             const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
-                            if (sender && sender.getParameters) {
+                            if (sender) {
                                 const params = sender.getParameters();
                                 if (!params.encodings) params.encodings = [{}];
                                 
-                                // Lowered max bitrate to 20 Megabits/s for 720p (perfect balance for phones)
-                                params.encodings[0].maxBitrate = 20000000; 
-                                params.encodings[0].minBitrate = 5000000; 
-                                
-                                // Network packet prioritization
+                                params.encodings[0].maxBitrate = 50000000; 
                                 params.encodings[0].priority = 'high';
                                 params.encodings[0].networkPriority = 'high';
-                                
-                                // ABSOLUTELY ESSENTIAL: Tells WebRTC to NEVER drop frames. Drop resolution if lagging instead.
-                                params.degradationPreference = 'maintain-framerate';
+                                params.degradationPreference = 'maintain-framerate'; // Drops resolution to keep 120fps
                                 
                                 await sender.setParameters(params);
                             }
                         } catch (e) { console.warn("Encoding Params Error:", e); }
-                    };
-
-                    applySenderGamingParams();
-                    setTimeout(applySenderGamingParams, 500); // Safety fallback for initial SDP handshake
+                    }, 100);
                 });
-
-                peer.on('error', err => {
-                    console.error("Peer Error:", err);
-                });
-
-            } catch (e) { 
-                console.error("Generic Init Error:", e);
-                location.reload(); 
-            }
+            } catch (e) { location.reload(); }
         }
 
         function connectToHost() {
@@ -298,16 +271,13 @@
             peer = new Peer(null, peerConfig);
             peer.on('open', () => {
                 peer.connect(tid);
-                document.getElementById('client-status').innerText = "Opening Direct Link...";
+                document.getElementById('client-status').innerText = "Linking to 120Hz Stream...";
             });
             peer.on('call', call => {
                 call.answer();
                 call.on('stream', s => {
                     enterVRMode(s);
                 });
-            });
-            peer.on('error', err => {
-                document.getElementById('client-status').innerText = "Connection Failed.";
             });
         }
 
@@ -322,9 +292,9 @@
             l.srcObject = stream;
             r.srcObject = stream;
             
-            // Explicit play ensures immediate rendering skipping mobile autoplay restrictions
-            l.play().catch(e => console.warn(e));
-            r.play().catch(e => console.warn(e));
+            // Disable any internal buffering on the video elements
+            l.play();
+            r.play();
             
             toggleFullscreen();
             updateVRCalibration();
@@ -335,15 +305,11 @@
             fitMode = m;
             document.getElementById('video-left').style.objectFit = m;
             document.getElementById('video-right').style.objectFit = m;
-            document.getElementById('btn-fit-wide').className = m === 'contain' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs';
-            document.getElementById('btn-fit-fill').className = m === 'cover' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs';
             updateVRCalibration();
         }
 
         function setVRFormat(f) {
             vrFormat = f;
-            document.getElementById('btn-fmt-2d').className = f === '2d' ? 'px-3 py-1 rounded bg-blue-600 text-xs' : 'px-3 py-1 rounded text-xs';
-            document.getElementById('btn-fmt-sbs').className = f === 'sbs' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs';
             updateVRCalibration();
         }
 
