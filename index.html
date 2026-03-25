@@ -1,601 +1,731 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
     <title>Cardboard VR Streamer</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <style>
-        :root {
-            --bg: #020617;
-        }
 
-        html, body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            background-color: var(--bg);
-            color: white;
-            overflow: hidden;
+        body { 
+
+            background-color: #0f172a; 
+
+            color: white; 
+
+            overflow: hidden; 
+
             touch-action: none;
-            overscroll-behavior: none;
-            -webkit-user-select: none;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
+
         }
 
-        body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        #vr-container { 
+
+            display: none; 
+
+            width: 100vw; 
+
+            height: 100vh; 
+
+            background: #000; 
+
+            flex-direction: row; 
+
+            position: absolute; 
+
+            top: 0; 
+
+            left: 0; 
+
+            z-index: 50; 
+
         }
 
-        #vr-container {
-            display: none;
-            width: 100vw;
-            height: 100vh;
-            background: #000;
-            flex-direction: row;
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 50;
-            contain: strict;
-        }
+        .eye { 
 
-        .eye {
-            width: 50%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            position: relative;
-            background: #000;
+            width: 50%; 
+
+            height: 100%; 
+
+            display: flex; 
+
+            align-items: center; 
+
+            justify-content: center; 
+
+            overflow: hidden; 
+
+            position: relative; 
+
+            background: #000; 
+
         }
 
         .vignette {
-            position: absolute;
-            top: -10%;
-            left: -10%;
-            width: 120%;
-            height: 120%;
-            background: radial-gradient(circle at center, transparent 35%, rgba(0,0,0,0.75) 75%, #000 95%);
-            pointer-events: none;
+
+            position: absolute; 
+
+            top: -10%; left: -10%; width: 120%; height: 120%;
+
+            background: radial-gradient(circle at center, transparent 35%, rgba(0,0,0,0.8) 75%, #000 95%);
+
+            pointer-events: none; 
+
             z-index: 10;
+
         }
 
-        .eye video {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            transform-origin: center center;
-            will-change: transform;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-            image-rendering: auto;
+        .eye video { 
+
+            width: 100%; 
+
+            height: 100%; 
+
+            object-fit: contain; 
+
+            transition: transform 0.1s linear; 
+
         }
 
-        .divider {
-            position: absolute;
-            left: 50%;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: #000;
-            z-index: 20;
-            transform: translateX(-50%);
+        .divider { 
+
+            position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; 
+
+            background: #000; z-index: 20; transform: translateX(-50%); 
+
         }
 
-        input[type=range] {
-            accent-color: #3b82f6;
-            width: 100%;
-        }
+        input[type=range] { accent-color: #3b82f6; width: 100%; }
 
-        .hidden { display: none !important; }
     </style>
+
 </head>
 
-<body class="font-sans">
+<body class="flex flex-col items-center justify-center min-h-screen font-sans">
+
+
+
+    <!-- Main Menu -->
 
     <div id="screen-menu" class="flex flex-col items-center justify-center w-full max-w-md p-6 text-center space-y-6">
+
         <div class="mb-4">
-            <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">
-                VR Streamer
-            </h1>
-            <p class="text-slate-400 font-bold tracking-tighter uppercase text-xs">
-                120 FPS Low-Latency Profile
-            </p>
+
+            <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">VR Streamer</h1>
+
+            <p class="text-slate-400 font-bold tracking-tighter uppercase text-xs">LAN-Mode Performance Profile Active</p>
+
         </div>
 
         <button onclick="showScreen('screen-host')" class="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 rounded-2xl font-semibold text-lg transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-3">
+
             Share Screen (Host)
+
         </button>
 
         <button onclick="showScreen('screen-client')" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold text-lg transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-3">
+
             Enter VR Mode (Mobile)
+
         </button>
+
     </div>
 
+
+
+    <!-- Host Setup -->
+
     <div id="screen-host" class="hidden flex-col items-center justify-center w-full max-w-lg p-6 text-center space-y-6">
+
         <h2 class="text-3xl font-bold text-blue-400">Host Setup</h2>
 
         <div id="host-step-1" class="w-full flex flex-col items-center">
+
             <p class="text-slate-400 mb-4 text-sm bg-slate-800/80 p-3 rounded-xl border border-blue-500/30 text-left">
-                🔥 <b>HIGH-FPS PROFILE:</b><br>
-                1. <b>120 FPS requested:</b> Prioritizes motion clarity for games.<br>
-                2. <b>Low queueing:</b> Maintains framerate over heavy buffering.<br>
-                3. <b>Hardware-friendly path:</b> No unnecessary delay before tuning.
+
+                🔥 <b>SAME-WIFI OPTIMIZATIONS:</b><br>
+
+                1. <b>Uncapped LAN Bitrate:</b> Using full Wi-Fi bandwidth.<br>
+
+                2. <b>Zero Buffer:</b> Dropping late frames immediately.<br>
+
+                3. <b>720p Performance:</b> Maximum decode speed for mobile.
+
             </p>
 
             <button onclick="startScreenShare()" class="py-4 px-8 bg-blue-600 hover:bg-blue-500 rounded-2xl font-semibold text-lg shadow-lg">
+
                 Activate LAN Stream
+
             </button>
+
         </div>
 
         <div id="host-step-2" class="hidden w-full flex-col items-center space-y-4 bg-slate-800/50 p-6 rounded-3xl border border-slate-700/50">
+
             <div id="qrcode-container" class="bg-white p-4 rounded-2xl shadow-xl">
+
                 <div id="qrcode"></div>
+
             </div>
 
             <h1 id="host-id-display" class="text-4xl font-mono font-bold text-emerald-400 tracking-widest bg-slate-900/80 px-8 py-3 rounded-2xl border border-slate-700">...</h1>
+
             <p id="host-status" class="text-sm text-amber-400 animate-pulse">Waiting for connection...</p>
 
-            <video id="host-preview" autoplay muted playsinline preload="auto" disablepictureinpicture class="w-full mt-4 rounded-xl border border-slate-600 object-cover max-h-48 shadow-lg"></video>
+            <video id="host-preview" autoplay muted class="w-full mt-4 rounded-xl border border-slate-600 object-cover max-h-48 shadow-lg"></video>
+
         </div>
 
         <button onclick="location.reload()" class="text-slate-500 hover:text-white underline mt-4">Back</button>
+
     </div>
 
+
+
+    <!-- Mobile Client Setup -->
+
     <div id="screen-client" class="hidden flex-col items-center justify-center w-full max-w-md p-6 text-center space-y-6">
+
         <h2 class="text-3xl font-bold text-emerald-400">VR Receiver</h2>
 
-        <input type="text" id="target-id-input" maxlength="5" placeholder="CODE"
-               class="w-full text-center text-4xl font-mono tracking-widest py-5 bg-slate-800/80 border-2 border-slate-600 rounded-2xl text-white uppercase focus:border-emerald-500 focus:outline-none transition-all">
+        <input type="text" id="target-id-input" maxlength="5" placeholder="CODE" class="w-full text-center text-4xl font-mono tracking-widest py-5 bg-slate-800/80 border-2 border-slate-600 rounded-2xl text-white uppercase focus:border-emerald-500 focus:outline-none transition-all">
 
-        <button onclick="connectToHost()" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold text-lg shadow-lg shadow-emerald-500/30">
-            Connect
-        </button>
+        <button onclick="connectToHost()" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold text-lg shadow-lg shadow-emerald-500/30">Connect</button>
 
         <p id="client-status" class="text-sm text-slate-400 h-6"></p>
 
         <button onclick="location.reload()" class="text-slate-500 hover:text-white underline">Back</button>
+
     </div>
 
+
+
+    <!-- VR Split Screen View -->
+
     <div id="vr-container">
+
         <div class="eye">
-            <video id="video-left" autoplay playsinline muted preload="auto" disablepictureinpicture></video>
+
+            <video id="video-left" autoplay playsinline muted></video>
+
             <div class="vignette"></div>
+
         </div>
 
         <div class="divider"></div>
 
         <div class="eye">
-            <video id="video-right" autoplay playsinline muted preload="auto" disablepictureinpicture></video>
+
+            <video id="video-right" autoplay playsinline muted></video>
+
             <div class="vignette"></div>
+
         </div>
 
+
+
         <div id="vr-ui" class="absolute inset-0 flex flex-col items-center justify-between p-6 z-50 transition-opacity duration-300 opacity-0 pointer-events-none">
+
             <div class="flex justify-between w-full max-w-3xl">
-                <button onclick="exitVRMode()" class="bg-red-600/90 text-white px-5 py-3 rounded-xl backdrop-blur-md text-sm font-bold pointer-events-auto">
-                    Exit VR
-                </button>
-                <button onclick="toggleFullscreen()" class="bg-slate-800/90 text-white px-5 py-3 rounded-xl backdrop-blur-md text-sm font-bold pointer-events-auto">
-                    Fullscreen
-                </button>
+
+                <button onclick="exitVRMode()" class="bg-red-600/90 text-white px-5 py-3 rounded-xl backdrop-blur-md text-sm font-bold pointer-events-auto">Exit VR</button>
+
+                <button onclick="toggleFullscreen()" class="bg-slate-800/90 text-white px-5 py-3 rounded-xl backdrop-blur-md text-sm font-bold pointer-events-auto">Fullscreen</button>
+
             </div>
 
+            
+
             <div class="bg-slate-900/90 backdrop-blur-xl p-6 rounded-3xl flex flex-col md:flex-row gap-6 text-sm pointer-events-auto border border-slate-700/50 w-full max-w-3xl">
+
                 <div class="flex flex-col items-center border-r border-slate-700 pr-6">
+
                     <label class="text-slate-400 mb-2 text-[10px] uppercase font-bold">Source</label>
 
                     <div class="flex bg-slate-800 rounded-lg p-1 mb-2">
+
                         <button id="btn-fmt-2d" onclick="setVRFormat('2d')" class="px-3 py-1 rounded bg-blue-600 text-xs">2D</button>
+
                         <button id="btn-fmt-sbs" onclick="setVRFormat('sbs')" class="px-3 py-1 rounded text-xs ml-1">3D</button>
+
                     </div>
 
                     <label class="text-slate-400 mb-2 text-[10px] uppercase font-bold">Fit Mode</label>
 
                     <div class="flex bg-slate-800 rounded-lg p-1">
+
                         <button id="btn-fit-wide" onclick="setFitMode('contain')" class="px-3 py-1 rounded bg-emerald-600 text-xs">Wide</button>
+
                         <button id="btn-fit-fill" onclick="setFitMode('cover')" class="px-3 py-1 rounded text-xs ml-1">Fill</button>
+
                     </div>
+
                 </div>
 
                 <div class="flex-1 flex flex-col justify-center gap-4">
+
                     <div>
-                        <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase mb-1">
-                            <span>Zoom</span>
-                            <span id="lbl-zoom">1.0x</span>
-                        </div>
+
+                        <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase mb-1"><span>Zoom</span><span id="lbl-zoom">1.0x</span></div>
+
                         <input type="range" id="zoom-slider" min="0.5" max="2.5" step="0.05" value="1.0">
+
                     </div>
 
                     <div>
-                        <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase mb-1">
-                            <span>IPD</span>
-                            <span id="lbl-ipd">0px</span>
-                        </div>
+
+                        <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase mb-1"><span>IPD</span><span id="lbl-ipd">0px</span></div>
+
                         <input type="range" id="ipd-slider" min="-100" max="100" step="1" value="0">
+
                     </div>
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
 
+
+
     <script>
+
         let peer = null;
+
         let localStream = null;
-        let activeCall = null;
 
-        let vrFormat = '2d';
-        let fitMode = 'contain';
-        let currentZoom = 1.0;
-        let currentIpd = 0;
-        let uiTimeout;
+        let vrFormat = '2d', fitMode = 'contain', currentZoom = 1.0, currentIpd = 0, uiTimeout;
 
-        const PERFORMANCE_PROFILE = {
-            width: 1920,
-            height: 1080,
-            frameRate: 120,
-            maxBitrate: 35000000,
-            minBitrate: 18000000
-        };
+
 
         const peerConfig = {
+
             config: {
-                iceServers: [
-                    { urls: "stun:stun.l.google.com:19302" },
-                    { urls: "stun:stun1.l.google.com:19302" },
-                    { urls: "stun:stun2.l.google.com:19302" }
-                ],
-                iceCandidatePoolSize: 10,
+
+                iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+
                 bundlePolicy: "max-bundle",
+
                 rtcpMuxPolicy: "require",
+
                 sdpSemantics: "unified-plan"
+
             }
+
         };
 
+
+
         function showScreen(id) {
+
             ['screen-menu', 'screen-host', 'screen-client'].forEach(s => {
+
                 const el = document.getElementById(s);
+
                 el.classList.add('hidden');
+
                 el.classList.remove('flex');
+
             });
 
             const target = document.getElementById(id);
+
             target.classList.remove('hidden');
+
             target.classList.add('flex');
+
         }
+
+
 
         function generateShortId() {
+
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
             let res = '';
-            for (let i = 0; i < 5; i++) {
-                res += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
+
+            for(let i=0; i<5; i++) res += chars.charAt(Math.floor(Math.random()*chars.length));
+
             return res;
+
         }
+
+
 
         async function startScreenShare() {
+
             try {
+
+                // Initializing Peer first to ensure signaling is ready
+
                 const hostId = generateShortId();
+
                 peer = new Peer(hostId, peerConfig);
 
+
+
                 peer.on('open', async (id) => {
+
                     document.getElementById('host-id-display').innerText = id;
 
-                    const qrcodeEl = document.getElementById('qrcode');
-                    qrcodeEl.innerHTML = '';
-                    new QRCode(qrcodeEl, {
-                        text: window.location.origin + window.location.pathname + '?id=' + id,
-                        width: 180,
-                        height: 180
+                    
+
+                    // Clear previous QR code if any
+
+                    document.getElementById('qrcode').innerHTML = "";
+
+                    new QRCode(document.getElementById("qrcode"), { 
+
+                        text: window.location.origin + window.location.pathname + '?id=' + id, 
+
+                        width: 180, 
+
+                        height: 180 
+
                     });
+
+
 
                     try {
-                        localStream = await navigator.mediaDevices.getDisplayMedia({
-                            video: {
-                                cursor: "always",
-                                frameRate: { ideal: PERFORMANCE_PROFILE.frameRate, max: PERFORMANCE_PROFILE.frameRate },
-                                width: { ideal: PERFORMANCE_PROFILE.width, max: PERFORMANCE_PROFILE.width },
-                                height: { ideal: PERFORMANCE_PROFILE.height, max: PERFORMANCE_PROFILE.height },
-                                resizeMode: "none"
-                            },
-                            audio: false
+
+                        // Capture screen AFTER peer is open to avoid permission timeouts
+
+                        localStream = await navigator.mediaDevices.getDisplayMedia({ 
+
+                            video: { 
+
+                                cursor: "always", 
+
+                                frameRate: { ideal: 60 }, 
+
+                                width: { max: 1280 }, 
+
+                                height: { max: 720 }
+
+                            }, 
+
+                            audio: false 
+
                         });
 
+
+
                         const videoTrack = localStream.getVideoTracks()[0];
-                        if (videoTrack) {
-                            try {
-                                if ('contentHint' in videoTrack) videoTrack.contentHint = 'motion';
-                            } catch (_) {}
 
-                            try {
-                                await videoTrack.applyConstraints({
-                                    frameRate: { ideal: PERFORMANCE_PROFILE.frameRate, max: PERFORMANCE_PROFILE.frameRate },
-                                    width: { ideal: PERFORMANCE_PROFILE.width, max: PERFORMANCE_PROFILE.width },
-                                    height: { ideal: PERFORMANCE_PROFILE.height, max: PERFORMANCE_PROFILE.height }
-                                });
-                            } catch (constraintErr) {
-                                console.warn("Track constraints could not be applied:", constraintErr);
-                            }
+                        if (videoTrack && 'contentHint' in videoTrack) {
 
-                            videoTrack.addEventListener('ended', () => {
-                                document.getElementById('host-status').innerText = 'Capture stopped.';
-                            });
+                            videoTrack.contentHint = 'motion';
+
                         }
 
-                        const preview = document.getElementById('host-preview');
-                        preview.srcObject = localStream;
-                        preview.play?.().catch(() => {});
+
+
+                        document.getElementById('host-preview').srcObject = localStream;
 
                         document.getElementById('host-step-1').classList.add('hidden');
+
                         document.getElementById('host-step-2').classList.remove('hidden');
+
                         document.getElementById('host-step-2').classList.add('flex');
+
                     } catch (mediaErr) {
+
                         console.error("Media Capture Error:", mediaErr);
+
                         peer.destroy();
+
                     }
+
                 });
+
+
 
                 peer.on('connection', conn => {
-                    document.getElementById('host-status').innerText = "Client connected. Preparing stream...";
 
-                    conn.on('open', () => {
-                        try { conn.close(); } catch (_) {}
-                    });
+                    document.getElementById('host-status').innerText = "Streaming via Local Pipeline...";
 
-                    if (!localStream) {
-                        document.getElementById('host-status').innerText = "No capture stream yet.";
-                        return;
-                    }
+                    const call = peer.call(conn.peer, localStream);
 
-                    activeCall = peer.call(conn.peer, localStream);
-                    tuneOutgoingVideo(activeCall);
+                    
 
-                    activeCall.on('stream', () => {});
-                    activeCall.on('close', () => {
-                        document.getElementById('host-status').innerText = "Connection closed.";
-                    });
-                    activeCall.on('error', err => {
-                        console.warn("Call error:", err);
-                        document.getElementById('host-status').innerText = "Stream error.";
-                    });
+                    setTimeout(async () => {
 
-                    document.getElementById('host-status').innerText = "Streaming at highest available FPS...";
+                        try {
+
+                            const sender = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+
+                            if (sender && sender.getParameters) {
+
+                                const params = sender.getParameters();
+
+                                if (!params.encodings) params.encodings = [{}];
+
+                                
+
+                                params.encodings[0].maxBitrate = 35000000; 
+
+                                params.encodings[0].minBitrate = 15000000; 
+
+                                
+
+                                await sender.setParameters(params);
+
+                            }
+
+                        } catch (e) { console.warn("Encoding Params Error:", e); }
+
+                    }, 500);
+
                 });
+
+
 
                 peer.on('error', err => {
+
                     console.error("Peer Error:", err);
-                    const hostStatus = document.getElementById('host-status');
-                    if (hostStatus) hostStatus.innerText = "Peer error.";
+
                 });
-            } catch (e) {
+
+
+
+            } catch (e) { 
+
                 console.error("Generic Init Error:", e);
-                location.reload();
+
+                location.reload(); 
+
             }
+
         }
 
-        function tuneOutgoingVideo(call) {
-            const apply = async () => {
-                try {
-                    const pc = call?.peerConnection;
-                    if (!pc) return;
 
-                    const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
-                    if (!sender || !sender.getParameters || !sender.setParameters) return;
-
-                    const params = sender.getParameters();
-                    params.degradationPreference = 'maintain-framerate';
-                    params.encodings = (params.encodings && params.encodings.length) ? params.encodings : [{}];
-
-                    params.encodings[0].active = true;
-                    params.encodings[0].maxBitrate = PERFORMANCE_PROFILE.maxBitrate;
-                    params.encodings[0].minBitrate = PERFORMANCE_PROFILE.minBitrate;
-                    params.encodings[0].maxFramerate = PERFORMANCE_PROFILE.frameRate;
-                    params.encodings[0].scaleResolutionDownBy = 1.0;
-
-                    await sender.setParameters(params);
-                } catch (e) {
-                    console.warn("Encoding params could not be applied:", e);
-                }
-            };
-
-            apply();
-            setTimeout(apply, 150);
-            setTimeout(apply, 800);
-
-            try {
-                const pc = call?.peerConnection;
-                if (pc) {
-                    pc.addEventListener('iceconnectionstatechange', () => {
-                        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-                            apply();
-                        }
-                    });
-                }
-            } catch (_) {}
-        }
 
         function connectToHost() {
+
             const tid = document.getElementById('target-id-input').value.toUpperCase();
-            if (!tid) return;
+
+            if(!tid) return;
+
+
 
             peer = new Peer(null, peerConfig);
 
             peer.on('open', () => {
-                document.getElementById('client-status').innerText = "Opening direct link...";
-                const conn = peer.connect(tid, { serialization: 'json' });
 
-                conn.on('open', () => {
-                    document.getElementById('client-status').innerText = "Handshake complete.";
-                });
+                peer.connect(tid);
 
-                conn.on('close', () => {
-                    document.getElementById('client-status').innerText = "Link closed.";
-                });
+                document.getElementById('client-status').innerText = "Opening Direct Link...";
 
-                conn.on('error', () => {
-                    document.getElementById('client-status').innerText = "Link error.";
-                });
             });
 
             peer.on('call', call => {
-                document.getElementById('client-status').innerText = "Receiving stream...";
 
                 call.answer();
 
                 call.on('stream', s => {
+
                     enterVRMode(s);
+
                 });
 
-                call.on('error', () => {
-                    document.getElementById('client-status').innerText = "Stream failed.";
-                });
             });
 
             peer.on('error', err => {
-                console.error("Client peer error:", err);
-                document.getElementById('client-status').innerText = "Connection failed.";
+
+                document.getElementById('client-status').innerText = "Connection Failed.";
+
             });
+
         }
+
+
 
         function enterVRMode(stream) {
+
             document.getElementById('screen-client').classList.add('hidden');
+
             document.getElementById('screen-menu').classList.add('hidden');
 
-            const container = document.getElementById('vr-container');
-            container.style.display = 'flex';
+            document.getElementById('vr-container').style.display = 'flex';
+
+            
 
             const l = document.getElementById('video-left');
+
             const r = document.getElementById('video-right');
 
-            [l, r].forEach(v => {
-                v.srcObject = stream;
-                v.play?.().catch(() => {});
-            });
+            
 
-            requestAnimationFrame(() => {
-                toggleFullscreen();
-                updateVRCalibration();
-                showVRUI();
-            });
+            l.srcObject = stream;
+
+            r.srcObject = stream;
+
+            
+
+            toggleFullscreen();
+
+            updateVRCalibration();
+
+            showVRUI();
+
         }
+
+
 
         function setFitMode(m) {
+
             fitMode = m;
 
-            const l = document.getElementById('video-left');
-            const r = document.getElementById('video-right');
+            document.getElementById('video-left').style.objectFit = m;
 
-            l.style.objectFit = m;
-            r.style.objectFit = m;
+            document.getElementById('video-right').style.objectFit = m;
 
-            document.getElementById('btn-fit-wide').className = m === 'contain'
-                ? 'px-3 py-1 rounded bg-emerald-600 text-xs'
-                : 'px-3 py-1 rounded text-xs';
+            document.getElementById('btn-fit-wide').className = m === 'contain' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs';
 
-            document.getElementById('btn-fit-fill').className = m === 'cover'
-                ? 'px-3 py-1 rounded bg-emerald-600 text-xs'
-                : 'px-3 py-1 rounded text-xs';
+            document.getElementById('btn-fit-fill').className = m === 'cover' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs';
 
             updateVRCalibration();
+
         }
+
+
 
         function setVRFormat(f) {
+
             vrFormat = f;
 
-            document.getElementById('btn-fmt-2d').className = f === '2d'
-                ? 'px-3 py-1 rounded bg-blue-600 text-xs'
-                : 'px-3 py-1 rounded text-xs';
+            document.getElementById('btn-fmt-2d').className = f === '2d' ? 'px-3 py-1 rounded bg-blue-600 text-xs' : 'px-3 py-1 rounded text-xs';
 
-            document.getElementById('btn-fmt-sbs').className = f === 'sbs'
-                ? 'px-3 py-1 rounded bg-emerald-600 text-xs'
-                : 'px-3 py-1 rounded text-xs';
+            document.getElementById('btn-fmt-sbs').className = f === 'sbs' ? 'px-3 py-1 rounded bg-emerald-600 text-xs' : 'px-3 py-1 rounded text-xs';
 
             updateVRCalibration();
+
         }
 
+
+
         function updateVRCalibration() {
-            const l = document.getElementById('video-left');
-            const r = document.getElementById('video-right');
+
+            const l = document.getElementById('video-left'), r = document.getElementById('video-right');
 
             if (vrFormat === 'sbs') {
-                l.style.width = '200%';
-                l.style.objectPosition = 'left center';
-                r.style.width = '200%';
-                r.style.objectPosition = 'right center';
+
+                l.style.width = '200%'; l.style.objectPosition = 'left center';
+
+                r.style.width = '200%'; r.style.objectPosition = 'right center';
+
             } else {
-                l.style.width = '100%';
-                l.style.objectPosition = 'center center';
-                r.style.width = '100%';
-                r.style.objectPosition = 'center center';
+
+                l.style.width = '100%'; l.style.objectPosition = 'center center';
+
+                r.style.width = '100%'; r.style.objectPosition = 'center center';
+
             }
 
             l.style.transform = `scale(${currentZoom}) translateX(${currentIpd}px)`;
+
             r.style.transform = `scale(${currentZoom}) translateX(${-currentIpd}px)`;
+
         }
+
+
 
         function showVRUI() {
+
             const ui = document.getElementById('vr-ui');
-            ui.style.opacity = '1';
-            ui.style.pointerEvents = 'auto';
+
+            ui.style.opacity = '1'; ui.style.pointerEvents = 'auto';
 
             clearTimeout(uiTimeout);
-            uiTimeout = setTimeout(() => {
-                ui.style.opacity = '0';
-                ui.style.pointerEvents = 'none';
-            }, 4000);
+
+            uiTimeout = setTimeout(() => { ui.style.opacity = '0'; ui.style.pointerEvents = 'none'; }, 4000);
+
         }
 
-        document.getElementById('vr-container').addEventListener('click', e => {
-            if (!e.target.closest('.pointer-events-auto')) showVRUI();
+
+
+        document.getElementById('vr-container').addEventListener('click', e => { if(!e.target.closest('.pointer-events-auto')) showVRUI(); });
+
+        document.getElementById('zoom-slider').addEventListener('input', e => { 
+
+            currentZoom = e.target.value; 
+
+            document.getElementById('lbl-zoom').innerText = parseFloat(e.target.value).toFixed(2)+'x'; 
+
+            updateVRCalibration(); 
+
         });
 
-        document.getElementById('zoom-slider').addEventListener('input', e => {
-            currentZoom = parseFloat(e.target.value);
-            document.getElementById('lbl-zoom').innerText = currentZoom.toFixed(2) + 'x';
-            updateVRCalibration();
+        document.getElementById('ipd-slider').addEventListener('input', e => { 
+
+            currentIpd = e.target.value; 
+
+            document.getElementById('lbl-ipd').innerText = e.target.value+'px'; 
+
+            updateVRCalibration(); 
+
         });
 
-        document.getElementById('ipd-slider').addEventListener('input', e => {
-            currentIpd = parseInt(e.target.value, 10);
-            document.getElementById('lbl-ipd').innerText = e.target.value + 'px';
-            updateVRCalibration();
-        });
+        
 
         function toggleFullscreen() {
-            const el = document.documentElement;
+
+            let el = document.documentElement;
 
             if (!document.fullscreenElement) {
+
                 if (el.requestFullscreen) el.requestFullscreen();
+
                 else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+
             } else {
+
                 if (document.exitFullscreen) document.exitFullscreen();
+
                 else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+
             }
+
         }
 
-        function exitVRMode() {
-            location.reload();
-        }
+
+
+        function exitVRMode() { location.reload(); }
+
+        
 
         window.onload = () => {
+
             const urlParams = new URLSearchParams(window.location.search);
+
             const id = urlParams.get('id');
 
             if (id) {
+
                 showScreen('screen-client');
+
                 document.getElementById('target-id-input').value = id.toUpperCase();
+
             }
+
         };
+
     </script>
+
 </body>
+
 </html>
